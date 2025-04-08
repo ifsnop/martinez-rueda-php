@@ -14,6 +14,12 @@ $test = [
 	'region_b' => [[[1,0], [2,0], [2,1], [1,1]]],
 	'result_union' => [[[2,1], [2,0], [0,0], [0,1]]],
     ],
+    1 => [
+	'region_a' => [[[0,0],[-1,0],[-1,1],[0,1],[-0.5,0.5]]],
+	'region_b' => [[[0,0],[-2,2],[0,2]]],
+	'result_union' => [[[0,2],[0,0],[-1,0],[-1,1],[-2,2]]],
+	'result_intersect' => [[[-1,1],[-0.5,0.5],[0,1]]],
+    ],
 ];
 
 foreach( $test as $test_number => $test_predicates ) {
@@ -22,9 +28,19 @@ foreach( $test as $test_number => $test_predicates ) {
     $result = MR\Algorithm::union($pa, $pb)->getArray();
 
     if ( MR\Algorithm::arrays_are_equal($result, $test_predicates['result_union']) )
-	print "PASS {$test_number}" . PHP_EOL;
+	print "Result PASS {$test_number}" . PHP_EOL;
     else
-	print "FAIL {$test_number}" . PHP_EOL;
+	print "Result FAIL {$test_number}" . PHP_EOL;
+
+    if ( !isset($test_predicates['result_intersect']) )
+	continue;
+
+    $result = MR\Algorithm::intersect($pa, $pb)->getArray();
+    if ( MR\Algorithm::arrays_are_equal($result, $test_predicates['result_intersect']) )
+	print "Result PASS {$test_number} (intersect)" . PHP_EOL;
+    else
+	print "Result FAIL {$test_number} (intersect)" . PHP_EOL;
+
 }
 
 exit(0);

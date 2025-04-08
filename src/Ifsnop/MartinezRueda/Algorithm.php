@@ -284,9 +284,9 @@ class Algorithm {
 	);
     }
 
-    function selectIntersect($combinedPolySegments) {
+    public static function selectIntersect($combinedPolySegments) {
 	return new PolySegments(
-	    segments: __select(
+	    segments: self::__select(
 		$combinedPolySegments->combined, [
 		    0, 0, 0, 0,
 		    0, 2, 0, 2,
@@ -298,9 +298,9 @@ class Algorithm {
 	);
     }
 
-    function selectDifference($combinedPolySegments) {
+    public static function selectDifference($combinedPolySegments) {
 	return new PolySegments(
-	    segments: __select(
+	    segments: self::__select(
 		$combinedPolySegments->combined, [
 		    0, 0, 0, 0,
 		    2, 0, 2, 0,
@@ -312,9 +312,9 @@ class Algorithm {
 	);
     }
 
-    function selectDifferenceRev($combinedPolySegments) {
+    public static function selectDifferenceRev($combinedPolySegments) {
 	return new PolySegments(
-	    segments: __select(
+	    segments: self::__select(
 		$combinedPolySegments->combined, [
 		    0, 2, 1, 0,
 		    0, 0, 1, 1,
@@ -326,9 +326,9 @@ class Algorithm {
 	);
     }
 
-    function selectXor($combinedPolySegments) {
+    public static function selectXor($combinedPolySegments) {
 	return new PolySegments(
-	    segments: __select(
+	    segments: self::__select(
 		$combinedPolySegments->combined, [
 		    0, 2, 1, 0,
 		    2, 0, 0, 1,
@@ -378,20 +378,20 @@ class Algorithm {
 	}
     }
 
-    function intersect($polygon1, $polygon2) {
-	return __operate($polygon1, $polygon2, 'selectIntersect');
+    public static function intersect($polygon1, $polygon2) {
+	return self::__operate($polygon1, $polygon2, 'selectIntersect');
     }
 
-    function difference($polygon1, $polygon2) {
-	return __operate($polygon1, $polygon2, 'selectDifference');
+    public static function difference($polygon1, $polygon2) {
+	return self::__operate($polygon1, $polygon2, 'selectDifference');
     }
 
-    function differenceRev($polygon1, $polygon2) {
-	return __operate($polygon1, $polygon2, 'selectDifferenceRev');
+    public static function differenceRev($polygon1, $polygon2) {
+	return self::__operate($polygon1, $polygon2, 'selectDifferenceRev');
     }
 
-    function xoring($polygon1, $polygon2) {
-	return __operate($polygon1, $polygon2, 'selectXor');
+    public static function xoring($polygon1, $polygon2) {
+	return self::__operate($polygon1, $polygon2, 'selectXor');
     }
 
     public static function arrays_are_equal(array $a1, array $a2): bool {
