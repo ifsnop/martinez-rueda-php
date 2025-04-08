@@ -50,6 +50,9 @@ class Point {
     /*
      * Determina si un punto está por encima o sobre la línea definida por "left" y "right".
      * Usa el producto vectorial para hacer la evaluación.
+     * En el caso de encontrar problemas por la precisión de TOLERANCE, y en lugar
+     * de hacer el valor más pequeño, comprobar con el siguiente PR
+     * https://github.com/Henry00IS/ShapeEditor/commit/5584b25914ff53a773e4517482a028aab2cd8f1e
      */
     public static function pointAboveOrOnLine(Point $point, Point $left, Point $right) {
         return (
