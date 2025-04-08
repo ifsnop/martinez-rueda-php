@@ -4,6 +4,8 @@
  * Autoload function registration:
  * Registers a function to automatically load classes when they are not already included.
  * This code converts class names with namespaces into file paths to automatically load them.
+ * @url: https://zaemis.blogspot.com/2012/05/writing-minimal-psr-0-autoloader.html
+ * @author: Timothy Boronczyk https://zaemis.blogspot.com/
  */
 spl_autoload_register(function ($classname) {
 
