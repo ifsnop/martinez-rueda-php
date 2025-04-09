@@ -3,7 +3,7 @@
 # Martinez Rueda PHP
 
 Boolean operations on polygons (union, intersection, difference, xor)
-(this library is a port for PHP of [pypolybool](https://github.com/KaivnD/pypolybool)
+(this library is a port for PHP of [pypolybool](https://github.com/KaivnD/pypolybool))
 
 # Resources
 
@@ -24,6 +24,6 @@ See tests.php
 * [Notes on the Martinez-Rueda Polygon Clipping algorithm](https://liorsinai.github.io/mathematics/2025/01/11/bentley-ottman.html)
 * [Let's build! Boolean operations of polygons: Part 2 - Intersections](https://wellquite.org/posts/lets_build/polygons_intersections/)
 
-# improvements
-* [Speed improvement with inserts by bisection](https://github.com/velipso/polybooljs/issues/23)
+# Improvements
+* [Speed improvement with inserts by bisection](https://github.com/velipso/polybooljs/issues/23) [Pull](https://github.com/velipso/polybooljs/pull/28)
 
