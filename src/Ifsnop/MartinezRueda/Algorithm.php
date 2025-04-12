@@ -362,11 +362,11 @@ class Algorithm {
 	print __METHOD__ . PHP_EOL;
 	if (count($args) === 1 && is_array($args[0])) {
 	    $polygons = $args[0];
-	    $firstSegments = segments($polygons[0]);
+	    $firstSegments = self::segments($polygons[0]);
 	    for ($i = 1; $i < count($polygons); $i++) {
-		$secondSegments = segments($polygons[$i]);
-		$combined = combine($firstSegments, $secondSegments);
-		$firstSegments = selectUnion($combined);
+		$secondSegments = self::segments($polygons[$i]);
+		$combined = self::combine($firstSegments, $secondSegments);
+		$firstSegments = self::selectUnion($combined);
 	    }
 	    return polygon($firstSegments);
 	} elseif (count($args) === 2 &&
