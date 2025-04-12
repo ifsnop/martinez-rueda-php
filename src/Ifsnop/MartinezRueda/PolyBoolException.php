@@ -2,4 +2,4 @@
 
 namespace Ifsnop\MartinezRueda;
 
-class PolyBoolException extends Exception {}
+class PolyBoolException extends \Exception {}
