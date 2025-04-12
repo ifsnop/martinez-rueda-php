@@ -4,12 +4,13 @@ namespace Ifsnop\MartinezRueda;
 
 class Algorithm {
     public const TOLERANCE = 1e-10;
+    public const DEBUG = false;
 
-    public function reverseChain(&$chains, int $index) {
+    public static function reverseChain(&$chains, int $index) {
 	$chains[$index] = array_reverse($chains[$index]);
     }
 
-    public function appendChain(&$chains, int $index1, int $index2) {
+    public static function appendChain(&$chains, int $index1, int $index2) {
 	$chain1 = &$chains[$index1];
 	$chain2 = &$chains[$index2];
 	$tail = end($chain1);
@@ -30,7 +31,7 @@ class Algorithm {
     public static function segmentChainer(array $segments): array {
 	$regions = [];
 	$chains = [];
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 
 	if (false) print("NEWTEST") . PHP_EOL;
 	if (false) print_r($segments);
@@ -179,36 +180,36 @@ class Algorithm {
 		    if ($reverseFirst) {
 			if (false) print __METHOD__ . "::A33 k($k)" . PHP_EOL;
 			if (false) print_r($chains[$firstIndex]);
-			reverseChain($chains, $firstIndex);
+			self::reverseChain($chains, $firstIndex);
 			if (false) print_r($chains[$firstIndex]);
-			appendChain($chains, $firstIndex, $secondIndex);
+			self::appendChain($chains, $firstIndex, $secondIndex);
 		    } else {
 			if (false) print __METHOD__ . "::A34 k($k)" . PHP_EOL;
-			reverseChain($chains, $secondIndex);
-			appendChain($chains, $secondIndex, $firstIndex);
+			self::reverseChain($chains, $secondIndex);
+			self::appendChain($chains, $secondIndex, $firstIndex);
 		    }
 		    if (false) print __METHOD__ . "::A35 k($k)" . PHP_EOL;
 		} else {
 		    if (false) print __METHOD__ . "::A36 k($k)" . PHP_EOL;
-		    appendChain($chains, $secondIndex, $firstIndex);
+		    self::appendChain($chains, $secondIndex, $firstIndex);
 		}
 	    } else {
 		if (false) print __METHOD__ . "::A37 k($k)" . PHP_EOL;
 		if ($segmentChainerMatcher->secondMatch->matchesHead) {
 		    if (false) print __METHOD__ . "::A38 k($k)" . PHP_EOL;
-		    appendChain($chains, $firstIndex, $secondIndex);
+		    self::appendChain($chains, $firstIndex, $secondIndex);
 		} else {
 		    if (false) print __METHOD__ . "::A39 k($k)" . PHP_EOL;
 		    if ($reverseFirst) {
 			if (false) print __METHOD__ . "::A40 k($k)" . PHP_EOL;
-			reverseChain($chains, $firstIndex);
-			appendChain($chains, $secondIndex, $firstIndex);
+			self::reverseChain($chains, $firstIndex);
+			self::appendChain($chains, $secondIndex, $firstIndex);
 		    } else {
 			if (false) print __METHOD__ . "::A41 k($k)" . PHP_EOL;
 			if (false) print_r($chains[$secondIndex]);
-			reverseChain($chains, $secondIndex);
+			self::reverseChain($chains, $secondIndex);
 			if (false) print_r($chains[$secondIndex]);
-			appendChain($chains, $firstIndex, $secondIndex);
+			self::appendChain($chains, $firstIndex, $secondIndex);
 		    }
 		    if (false) print __METHOD__ . "::A42 k($k)" . PHP_EOL;
 		}
@@ -224,7 +225,7 @@ class Algorithm {
     }
 
     public static function __select(array $segments, array $selection): array {
-	echo __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	//print_r($segments); // IFSNOP
 	//print_r($selection);
 	$result = [];
@@ -341,14 +342,14 @@ class Algorithm {
     }
 
     public static function polygon($segments) {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	$s = self::segmentChainer($segments->segments);
 	$p = Polygon::create()->fillFromArray($s , $segments->isInverted);
 	return $p;
     }
 
     public static function __operate($polygon1, $polygon2, $selector) {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	$firstPolygonRegions = self::segments($polygon1);
 	$secondPolygonRegions = self::segments($polygon2);
 	$combinedSegments = self::combine($firstPolygonRegions, $secondPolygonRegions);
@@ -359,7 +360,7 @@ class Algorithm {
 
     // helper functions for common operations
     public static function union(...$args):Polygon {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	if (count($args) === 1 && is_array($args[0])) {
 	    $polygons = $args[0];
 	    $firstSegments = self::segments($polygons[0]);
@@ -395,7 +396,7 @@ class Algorithm {
     }
 
     public static function arrays_are_equal(array $a1, array $a2): bool {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	if (count($a1) !== count($a2)) {
 	    return false; // Si tienen diferentes tamaños, no son iguales
 	}
@@ -415,7 +416,7 @@ class Algorithm {
     }
 
     public static function arrays_are_similar(array $a1, array $a2): bool {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	if (count($a1) !== count($a2)) {
 	    // print "distinto tamaño " . count($a1) .  " " . count($a2) . PHP_EOL;
 	    return false; // Si tienen diferentes tamaños, no son iguales

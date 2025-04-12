@@ -105,7 +105,7 @@ class Intersecter {
     }
 
     private function statusCompare(Node $ev1, Node $ev2): int {
-	echo __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         $a1 = $ev1->seg->start;
         $a2 = $ev1->seg->end;
         $b1 = $ev2->seg->start;
@@ -207,7 +207,7 @@ class Intersecter {
     }
 
     public function calculate(bool $primaryPolyInverted, bool $secondaryPolyInverted): array {
-        echo __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         $statusRoot = new LinkedList();
         $segments = [];
 

@@ -32,16 +32,29 @@ class Polygon {
 	return $arr_regions;
     }
 
+    public function getArrayClosed() {
+	$arr_regions = [];
+	foreach($this->regions as $region) {
+	    $arr_points = [];
+	    foreach($region as $point) {
+		$arr_points[] = $point->getArray();
+	    }
+	    $arr_points[] = $arr_points[0];
+	    $arr_regions[] = $arr_points;
+	}
+	return $arr_regions;
+    }
+
     public function __construct(){
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
     }
 
     public static function create() {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	return new self();
     }
     public function fillFromArray(array $regions, bool $isInverted = false) {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         $_regions = [];
         foreach ($regions as $region) {
             $tmp = [];
@@ -60,7 +73,7 @@ class Polygon {
 	return $this;
     }
     public function fillFromPolySegments(PolySegments $regions, bool $isInverted = false) {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         $_regions = [];
         foreach ($regions as $region) {
             $tmp = [];
@@ -89,4 +102,3 @@ class Polygon {
 	return $this;
     }
 }
-

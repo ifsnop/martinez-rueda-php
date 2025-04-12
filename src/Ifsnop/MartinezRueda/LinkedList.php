@@ -22,7 +22,7 @@ class LinkedList {
     }
 
     public function insertBefore(Node $node, callable $check) {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         $last = $this->root;
         $here = $this->root->next;
 
@@ -43,7 +43,7 @@ class LinkedList {
     }
 
     public function findTransition(callable $check) {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         $previous = $this->root;
         $here = $this->root->next;
 
@@ -73,7 +73,7 @@ class LinkedList {
     }
 
     public static function node(Node $data) {
-	print __METHOD__ . PHP_EOL;
+	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         $data->previous = null;
         $data->next = null;
 
