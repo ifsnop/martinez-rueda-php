@@ -39,6 +39,15 @@ $test = [
 		[3.292779172743269, -14.709442780204576]]],
 	]
     ],
+    3 => [ // three triangles
+	'region_a' => [[ [-1,1], [1,-1], [1,1] ]],
+	'region_b' => [[ [0,0], [0,1], [1,0] ]],
+	'res' => [
+	    'union' => [[[-1,1],[1,-1],[1,1]]],
+	    'difference' => [[[-1,1],[0,0],[0,1]],[[0,0],[1,-1],[1,0]],[[0,1],[1,0],[1,1]]],
+
+	]
+    ]
 ];
 
 foreach( $test as $test_number => $test_predicates ) {
@@ -50,8 +59,10 @@ foreach( $test as $test_number => $test_predicates ) {
 
 	if ( MR\Algorithm::arrays_are_equal($result, $verified_result) )
 	    print "Result PASS {$test_number} {$op}" . PHP_EOL;
-	else
+	else {
 	    print "Result FAIL {$test_number} {$op}" . PHP_EOL;
+	    print json_encode($result) . PHP_EOL;
+	}
     }
 }
 
