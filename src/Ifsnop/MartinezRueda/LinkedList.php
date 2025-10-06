@@ -3,90 +3,142 @@
 namespace Ifsnop\MartinezRueda;
 
 class LinkedList {
-    private $root;
+    private Node $root;
 
     public function __construct() {
         $this->root = new Node(isRoot: true);
     }
 
-    public function exists(?Node $node) {
+    /**
+     * Verifica si un nodo existe y es válido (no es null ni root)
+     */
+    public function exists(?Node $node): bool {
         return $node !== null && $node !== $this->root;
     }
 
-    public function isEmpty() {
+    /**
+     * Verifica si la lista está vacía
+     */
+    public function isEmpty(): bool {
         return $this->root->next === null;
     }
 
-    public function getHead() {
+    /**
+     * Obtiene el primer nodo de la lista (cabeza)
+     */
+    public function getHead(): ?Node {
         return $this->root->next;
     }
 
-    public function insertBefore(Node $node, callable $check) {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-        $last = $this->root;
-        $here = $this->root->next;
+    /**
+     * Inserta un nodo antes del primer nodo que cumpla la condición
+     * Si ningún nodo cumple la condición, lo inserta al final
+     *
+     * @param Node $node Nodo a insertar
+     * @param callable $check Función que recibe un Node y retorna bool
+     */
+    public function insertBefore(Node $node, callable $check): void {
+        if (Algorithm::DEBUG) {
+            print __METHOD__ . PHP_EOL;
+        }
 
-        while ($here !== null) {
-            if ($check($here)) {
-                $node->previous = $here->previous;
-                $node->next = $here;
-                $here->previous->next = $node;
-                $here->previous = $node;
+        $previous = $this->root;
+        $current = $this->root->next;
+
+        // Buscar la posición donde insertar
+        while ($current !== null) {
+            if ($check($current)) {
+                // Insertar antes de current
+                $this->linkNodes($previous, $node, $current);
                 return;
             }
-            $last = $here;
-            $here = $here->next;
+            $previous = $current;
+            $current = $current->next;
         }
-        $last->next = $node;
-        $node->previous = $last;
-        $node->next = null;
+
+        // No se encontró posición, insertar al final
+        $this->linkNodes($previous, $node, null);
     }
 
-    public function findTransition(callable $check) {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-        $previous = $this->root;
-        $here = $this->root->next;
-
-        while ($here !== null) {
-            if ($check($here)) {
-                break;
-            }
-            $previous = $here;
-            $here = $here->next;
+    /**
+     * Encuentra la transición entre dos nodos según una condición
+     * Retorna un objeto Transition con los nodos before/after y una función insert
+     *
+     * @param callable $check Función que recibe un Node y retorna bool
+     * @return Transition
+     */
+    public function findTransition(callable $check): Transition {
+        if (Algorithm::DEBUG) {
+            print __METHOD__ . PHP_EOL;
         }
 
-        $insertFunc = function(Node $node) use ($previous, $here) {
-            $node->previous = $previous;
-            $node->next = $here;
-            $previous->next = $node;
-            if ($here !== null) {
-                $here->previous = $node;
-            }
+        $previous = $this->root;
+        $current = $this->root->next;
+
+        // Buscar el primer nodo que cumpla la condición
+        while ($current !== null && !$check($current)) {
+            $previous = $current;
+            $current = $current->next;
+        }
+
+        // Crear función de inserción para esta transición
+        $insertFunc = function(Node $node) use ($previous, $current): Node {
+            $this->linkNodes($previous, $node, $current);
             return $node;
         };
 
         return new Transition(
             before: $previous === $this->root ? null : $previous,
-            after: $here,
+            after: $current,
             insert: $insertFunc
         );
     }
 
-    public static function node(Node $data) {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-        $data->previous = null;
-        $data->next = null;
+    /**
+     * Prepara un nodo para ser usado en la lista
+     * Inicializa sus enlaces y función de eliminación
+     *
+     * @param Node $node Nodo a preparar
+     * @return Node El mismo nodo preparado
+     */
+    public static function node(Node $node): Node {
+        if (Algorithm::DEBUG) {
+            print __METHOD__ . PHP_EOL;
+        }
 
-        $removeFunc = function() use ($data) {
-            $data->previous->next = $data->next;
-            if ($data->next !== null) {
-                $data->next->previous = $data->previous;
+        $node->previous = null;
+        $node->next = null;
+
+        // Crear función de eliminación
+        $node->remove = function() use ($node): void {
+            if ($node->previous !== null) {
+                $node->previous->next = $node->next;
             }
-            $data->previous = null;
-            $data->next = null;
+            if ($node->next !== null) {
+                $node->next->previous = $node->previous;
+            }
+            $node->previous = null;
+            $node->next = null;
         };
 
-        $data->remove = $removeFunc;
-        return $data;
+        return $node;
+    }
+
+    /**
+     * Método privado para enlazar tres nodos consecutivamente
+     * Optimiza el código repetido de enlazar nodos
+     *
+     * @param Node $before Nodo anterior
+     * @param Node $middle Nodo a insertar en el medio
+     * @param Node|null $after Nodo siguiente (puede ser null si es el final)
+     */
+    private function linkNodes(Node $before, Node $middle, ?Node $after): void {
+        $middle->previous = $before;
+        $middle->next = $after;
+        $before->next = $middle;
+
+        if ($after !== null) {
+            $after->previous = $middle;
+        }
     }
 }
