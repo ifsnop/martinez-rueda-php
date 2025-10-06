@@ -208,14 +208,15 @@ class Intersecter {
 
     public function calculate(bool $primaryPolyInverted, bool $secondaryPolyInverted): array {
 	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-        $statusRoot = new LinkedList();
+        // $statusRoot = new LinkedList();
+	$statusRoot = new LinkedList(LinkedList::MODE_STATUS);
         $segments = [];
 
-        $cnt = 0;
+        // $cnt = 0;
 
         while (!$this->eventRoot->isEmpty()) {
             // echo __METHOD__.":cnt=".$cnt . PHP_EOL;
-            $cnt++;
+            // $cnt++;
             $ev = $this->eventRoot->getHead();
             if ($ev->isStart) {
                 $surrounding = $this->statusFindSurrounding($statusRoot, $ev);
