@@ -92,7 +92,8 @@ class Intersecter {
     }
 
     private function eventUpdateEnd(Node $ev, Point $end) {
-        call_user_func($ev->other->remove);
+        //call_user_func($ev->other->remove);
+	($ev->other->remove)();
         $ev->seg->end = $end;
         $ev->other->pt = $end;
         $this->eventAdd($ev->other, $ev->pt);
@@ -120,7 +121,7 @@ class Intersecter {
         return Point::pointAboveOrOnLine($a1, $b1, $b2) ? 1 : -1;
     }
 
-    private function statusFindSurrounding(LinkedList $statusRoot, Node $ev): ?Transition { // ?Node {
+    private function statusFindSurrounding(StatusList $statusRoot, Node $ev): ?Transition { // ?Node {
         $checkFunc = function(Node $here) use ($ev) {
             return $this->statusCompare($ev, $here->ev) > 0;
         };
@@ -209,7 +210,8 @@ class Intersecter {
     public function calculate(bool $primaryPolyInverted, bool $secondaryPolyInverted): array {
 	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         // $statusRoot = new LinkedList();
-	$statusRoot = new LinkedList(LinkedList::MODE_STATUS);
+	// $statusRoot = new LinkedList(LinkedList::MODE_STATUS);
+	$statusRoot = new StatusList(); // LinkedList(LinkedList::MODE_STATUS);
         $segments = [];
 
         // $cnt = 0;
@@ -242,8 +244,10 @@ class Intersecter {
                     } else {
                         $eve->seg->otherFill = $ev->seg->myFill;
                     }
-                    call_user_func($ev->other->remove);
-                    call_user_func($ev->remove);
+                    //call_user_func($ev->other->remove);
+		    ($ev->other->remove)();
+                    //call_user_func($ev->remove);
+		    ($ev->remove)();
                 }
 
                 if ($this->eventRoot->getHead() !== $ev) {
@@ -280,10 +284,13 @@ class Intersecter {
                         $ev->seg->otherFill = new Fill($inside, $inside);
                     }
                 }
+		/*
 		$ev->other->status = call_user_func_array(
 		    $surrounding->insert,
-		    array(LinkedList::node(new Node(ev : $ev)))
+		    array(StatusList::node(new Node(ev : $ev)))
 		);
+		*/
+		$ev->other->status = ($surrounding->insert)(StatusList::node(new Node(ev : $ev)));
             } else {
                 $st = $ev->status;
                 if ($st === null) {
@@ -292,7 +299,9 @@ class Intersecter {
                 if ($statusRoot->exists($st->previous) && $statusRoot->exists($st->next)) {
                     $this->checkIntersection($st->previous->ev, $st->next->ev);
                 }
-                call_user_func($st->remove);
+		// call_user_func($st->remove);
+		($st->remove)();
+
 
                 if (!$ev->primary) {
                     $s = $ev->seg->myFill;
@@ -301,7 +310,8 @@ class Intersecter {
                 }
                 $segments[] = $ev->seg;
             }
-            call_user_func($this->eventRoot->getHead()->remove);
+            //call_user_func($this->eventRoot->getHead()->remove);
+	    ($this->eventRoot->getHead()->remove)();
         }
         // print_r($segments);
         // var_dump($segments);
