@@ -42,6 +42,16 @@ class LinkedList {
             print __METHOD__ . PHP_EOL;
         }
 
+	// Desenlaza si ya estaba en una lista (si tienes owner) o si tiene enlaces activos
+	if ($node->previous !== null || $node->next !== null) {
+	    if ( is_callable($node->remove)) {
+		($node->remove)(); // tu closure ya limpia previous/next
+		die("este if es una optimización de copilot, antes no existía");
+	    }
+	    // si no hay remove asignado, al menos limpia punteros:
+	    $node->previous = null; $node->next = null;
+	}
+
         $previous = $this->root;
         $current = $this->root->next;
 
