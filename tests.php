@@ -88,8 +88,29 @@ foreach( $test as $test_number => $test_predicates ) {
     }
 }
 
-exit(0);
 
+
+// UNION DE DOS POLIGONOS INDEPENDIENTES
+$region_a = [[[0,0],[0,1],[1,1],[1,0]]];
+$region_b = [[[4,4],[4,5],[5,5],[5,4]]];
+$pa = MR\Polygon::create()->fillFromArray($region_a);
+$pb = MR\Polygon::create()->fillFromArray($region_b);
+$result = MR\Algorithm::union($pa, $pb)->getArray();
+print "INDEPENDIENTES: " . json_encode($result) . PHP_EOL;
+print json_encode(MR\GJTools::ringsToCoordinates($result)) . PHP_EOL;;
+
+// DIFERENCIA DE UN POLIGONO DENTRO DE OTRO
+$region_a = [[[0,0],[3,0],[3,3],[0,3]]];
+$region_b = [[[1,1],[2,1],[2,2],[1,2]]];
+$pa = MR\Polygon::create()->fillFromArray($region_a);
+$pb = MR\Polygon::create()->fillFromArray($region_b);
+$result = MR\Algorithm::difference($pa, $pb)->getArray();
+print "CON HUECO: " . json_encode($result) . PHP_EOL;
+
+print json_encode(MR\GJTools::ringsToCoordinates($result)) . PHP_EOL;
+print json_encode(MR\GJTools::ringsToGeoJSON($result)) . PHP_EOL;
+
+exit(0);
 
 
 $region_a = [[[0,0],[-1,0],[-1,1],[0,1],[-0.5,0.5]]];
