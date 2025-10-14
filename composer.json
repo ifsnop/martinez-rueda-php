@@ -1,0 +1,16 @@
+{
+    "name": "ifsnop/martinez-rueda",
+    "autoload": {
+        "psr-4": {
+            "Ifsnop\\MartinezRueda\\": "src/Ifsnop/MartinezRueda/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Ifsnop\\MartinezRueda\\Tests\\": "tests/"
+        }
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    }
+}

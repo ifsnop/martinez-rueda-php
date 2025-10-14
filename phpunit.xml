@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+	bootstrap="vendor/autoload.php"
+	colors="true"
+	displayDetailsOnPhpunitDeprecations="true"
+	displayDetailsOnTestsThatTriggerErrors="true"
+	displayDetailsOnTestsThatTriggerNotices="true"
+	displayDetailsOnTestsThatTriggerWarnings="true"
+>
+    <testsuites>
+        <testsuite name="Test Suite">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <ini name="error_reporting" value="-1" />
+        <ini name="display_errors" value="1" />
+        <ini name="display_startup_errors" value="1" />
+
+	<env name="PC_FIXTURES_DIR" value="tests/end-to-end"/>
+	<env name="PC_MAX" value="2147483647"/>
+
+    </php>
+</phpunit>
