@@ -17,14 +17,12 @@
         ]
       }
     },
-
-
     {
       "type": "Feature",
       "properties": {},
       "geometry": {
-        "type": "Polygon",
-        "coordinates":
+        "type": "MultiPolygon",
+        "coordinates": [
           [
             [
               [12.75, 6.25],
@@ -45,18 +43,7 @@
               [10.25, 6.25],
               [12.75, 6.25]
             ]
-          ]
-
-      }
-    },
-
-    {
-      "type": "Feature",
-      "properties": {},
-      "geometry": {
-        "type": "Polygon",
-        "coordinates":
-
+          ],
           [
             [
               [8, 2],
@@ -74,7 +61,7 @@
               [9, 3]
             ]
           ]
-
+        ]
       }
     }
   ]

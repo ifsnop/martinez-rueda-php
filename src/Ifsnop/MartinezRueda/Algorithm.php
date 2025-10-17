@@ -3,7 +3,7 @@
 namespace Ifsnop\MartinezRueda;
 
 class Algorithm {
-    public const TOLERANCE = 1e-10;
+    public const TOLERANCE = 1e-9;
     public const DEBUG = false;
 
     public static function reverseChain(&$chains, int $index) {

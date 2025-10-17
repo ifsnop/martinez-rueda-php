@@ -107,8 +107,31 @@ $pb = MR\Polygon::create()->fillFromArray($region_b);
 $result = MR\Algorithm::difference($pa, $pb)->getArray();
 print "CON HUECO: " . json_encode($result) . PHP_EOL;
 
+$region_a = [[[0,0],[4,0],[4,3],[0,3]]];
+$region_b = [[[2,-1],[6,-1],[6,2],[2,2]]];
+$pa = MR\Polygon::create()->fillFromArray($region_a);
+$pb = MR\Polygon::create()->fillFromArray($region_b);
+$result = MR\Algorithm::union($pa, $pb)->getArray();
+print PHP_EOL;
+print json_encode($region_a) . PHP_EOL;
+print json_encode($region_b) . PHP_EOL;
+print "resultado: " . json_encode($result) . PHP_EOL;
+print json_encode(MR\GJTools::ringsToCoordinates($result)) . PHP_EOL . PHP_EOL;
+
+
+$region_a = [[[0,0],[1,0],[1,1],[0,0]]];
+$region_b = [[[0,0],[1,1],[0,1],[0,0]]];
+$pa = MR\Polygon::create()->fillFromArray($region_a);
+$pb = MR\Polygon::create()->fillFromArray($region_b);
+$result = MR\Algorithm::union($pa, $pb)->getArray();
+print PHP_EOL;
+print json_encode($region_a) . PHP_EOL;
+print json_encode($region_b) . PHP_EOL;
+print "resultado: " . json_encode($result) . PHP_EOL;
 print json_encode(MR\GJTools::ringsToCoordinates($result)) . PHP_EOL;
-print json_encode(MR\GJTools::ringsToGeoJSON($result)) . PHP_EOL;
+
+//print json_encode(MR\GJTools::ringsToCoordinates($result)) . PHP_EOL;
+//print json_encode(MR\GJTools::ringsToGeoJSON($result)) . PHP_EOL;
 
 exit(0);
 

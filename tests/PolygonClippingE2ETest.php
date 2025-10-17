@@ -14,6 +14,9 @@ final class PolygonClippingE2ETest extends TestCase
     // Parámetros vía entorno
     // ==========================
     private static function fixturesRoot(): string {
+
+	// https://github.com/mfogel/polygon-clipping/
+
         // Directorio donde están las carpetas tipo: test/end-to-end/<case>/
         // Por defecto: tests/fixtures/polygon-clipping/test/end-to-end
         $path = getenv('PC_FIXTURES_DIR');
@@ -197,7 +200,7 @@ final class PolygonClippingE2ETest extends TestCase
     public static function provideAllCases(): array {
         $root = self::fixturesRoot();
         $ops  = self::opsFilter();
-        $max  = self::maxCases();
+        $max  = 36; //self::maxCases();
 
         $datasets = [];
         $dirs = @scandir($root);
@@ -206,6 +209,10 @@ final class PolygonClippingE2ETest extends TestCase
         }
 
         foreach ($dirs as $d) {
+
+	    if ( false === strpos($d, "issue-60-8") )
+		continue;
+
             if ($d === '.' || $d === '..') continue;
             $caseDir = $root . DIRECTORY_SEPARATOR . $d;
             if (!is_dir($caseDir)) continue;

@@ -7,19 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Ifsnop\MartinezRueda\StatusList;
 use Ifsnop\MartinezRueda\Node;
 use Ifsnop\MartinezRueda\Transition;
-
-/**
- * Mock Algorithm class for testing
- */
-class MockAlgorithm
-{
- public const TOLERANCE = 1e-10;
-    public const DEBUG = false;
-
-}
-
-// Alias for testing
-class_alias(MockAlgorithm::class, 'Ifsnop\MartinezRueda\Algorithm');
+use Ifsnop\MartinzRueda\Algorithm;
 
 /**
  * Performance and correctness tests for StatusList
