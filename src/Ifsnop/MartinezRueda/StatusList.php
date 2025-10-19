@@ -73,7 +73,7 @@ final class StatusList
 	    return $node;
 	};
 
-        return new Transition(before: $before, after: $after, insert: $insertFunc);
+        return new Transition(after: $after, before: $before, insert: $insertFunc);
     }
 
     public static function node(Node $data): Node

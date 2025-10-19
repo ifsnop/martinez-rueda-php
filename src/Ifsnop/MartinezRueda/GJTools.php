@@ -31,6 +31,9 @@ final class GJTools
         $areas = [];
         $bboxes = [];
         foreach ($rings as $idx => $ring) {
+	    if ( !is_array($ring) ) {
+                throw new \InvalidArgumentException("Anillo $idx inválido: no está definido.");
+	    }
 	    $ring = self::dedupConsecutive($ring);
 	    // $ring = self::removeCollinear($ring);
 	    $ring = self::removeColinearPointsFromPolygon($ring);
@@ -218,6 +221,7 @@ final class GJTools
 
 
 public static function removeColinearPointsFromPolygon($polygonCoords):array {
+
     // Asegura que el anillo esté cerrado
     if ($polygonCoords[0] !== end($polygonCoords)) {
         $polygonCoords[] = $polygonCoords[0];

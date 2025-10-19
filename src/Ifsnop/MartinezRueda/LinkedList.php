@@ -30,6 +30,25 @@ class LinkedList {
         return $this->root->next;
     }
 
+
+    /**
+     * Devuelve el número de elementos (no cuenta el nodo raíz/centinela).
+     * Complejidad: O(n)
+     */
+    public function size(): int
+    {
+        $count = 0;
+        $current = $this->root->next;
+
+        while ($current !== null) {
+            $count++;
+            $current = $current->next;
+        }
+
+        return $count;
+    }
+
+
     /**
      * Inserta un nodo antes del primer nodo que cumpla la condición
      * Si ningún nodo cumple la condición, lo inserta al final
@@ -46,7 +65,6 @@ class LinkedList {
 	if ($node->previous !== null || $node->next !== null) {
 	    if ( is_callable($node->remove)) {
 		($node->remove)(); // tu closure ya limpia previous/next
-		die("este if es una optimización de copilot, antes no existía");
 	    }
 	    // si no hay remove asignado, al menos limpia punteros:
 	    $node->previous = null; $node->next = null;
@@ -94,6 +112,14 @@ class LinkedList {
         // Crear función de inserción para esta transición
         $insertFunc = function(Node $node) use ($previous, $current): Node {
             $this->linkNodes($previous, $node, $current);
+
+	    $node->remove = function() use ($node) : void {
+		if ($node->previous !== null) { $node->previous->next = $node->next; }
+		if ($node->next !== null)     { $node->next->previous = $node->previous; }
+		$node->previous = null;
+		$node->next = null;
+	    };
+
             return $node;
         };
 

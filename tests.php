@@ -69,6 +69,14 @@ $test = [
 	    'difference' => [[[-89.1214798,30.2253957],[-89.1207072,30.2251544],[-89.1205,30.2251544],[-89.1205,30.226]]],
 	],
     ],
+    7 => [
+	'region_a' => [[[150.873, -10.017],[150.867925, -10.013013],[150.8708803653717, -10.01678734229192]]],
+	'region_b' => [[[150.873, -10.017],[150.871475815773, -10.0166398791],[150.87071943283, -10.01682719716]]],
+	'res' => [
+	    // 'union' => [[[150.867925,-10.013013],[150.870880365,-10.016787342],[150.870719433,-10.016827197],[150.873,-10.017],[150.867925,-10.013013]]],
+	    'union' => [[[150.873,-10.017],[150.87071943283,-10.01682719716],[150.87088036534647,-10.016787342259704],[150.867925,-10.013013]]],
+	],
+    ],
 ];
 
 foreach( $test as $test_number => $test_predicates ) {
@@ -82,8 +90,11 @@ foreach( $test as $test_number => $test_predicates ) {
 	    print "Result PASS {$test_number} {$op}" . PHP_EOL;
 	else {
 	    print "Result FAIL {$test_number} {$op}" . PHP_EOL;
-	    print "Expected: " . json_encode($verified_result) . PHP_EOL;
-	    print "Got: " . json_encode($result) . PHP_EOL;
+	    print "0: " . json_encode(MR\GJTools::ringsToCoordinates($test_predicates['region_a'])[0]) . PHP_EOL;
+	    print "1: " . json_encode(MR\GJTools::ringsToCoordinates($test_predicates['region_b'])[0]) . PHP_EOL;
+	    print "Exp: " . json_encode(MR\GJTools::ringsToCoordinates($verified_result)) . PHP_EOL;
+	    print "Got: " . json_encode(MR\GJTools::ringsToCoordinates($result)) . PHP_EOL;
+	    print "GoN: " . json_encode($result) . PHP_EOL;
 	}
     }
 }

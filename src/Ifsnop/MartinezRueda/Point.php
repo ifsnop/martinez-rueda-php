@@ -72,12 +72,15 @@ class Point {
         $dRyLy = $right->y - $left->y;
 
         $dot = $dPxLx * $dRxLx + $dPyLy * $dRyLy;
-        if ($dot < Algorithm::TOLERANCE) {
+	// CAMBIO 3
+        // if ($dot < Algorithm::TOLERANCE) {
+        if ($dot < -Algorithm::TOLERANCE) {
             return false;
         }
 
         $sqlen = $dRxLx * $dRxLx + $dRyLy * $dRyLy;
-        if ($dot - $sqlen > -Algorithm::TOLERANCE) {
+        // if ($dot - $sqlen > -Algorithm::TOLERANCE) {
+        if ($dot - $sqlen > Algorithm::TOLERANCE) {
             return false;
         }
 

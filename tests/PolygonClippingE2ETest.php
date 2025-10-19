@@ -210,8 +210,8 @@ final class PolygonClippingE2ETest extends TestCase
 
         foreach ($dirs as $d) {
 
-	    if ( false === strpos($d, "issue-60-8") )
-		continue;
+	//    if ( false === strpos($d, "issue-60-8") )
+	//	continue;
 
             if ($d === '.' || $d === '..') continue;
             $caseDir = $root . DIRECTORY_SEPARATOR . $d;
@@ -272,6 +272,11 @@ final class PolygonClippingE2ETest extends TestCase
             $this->markTestSkipped("[$label] args sin geometrías: $argsPath");
         }
 	foreach($geoms as $k => $g) print "$k: " . json_encode($g) . PHP_EOL;
+
+	
+	// Activa el modo debug
+	// MR\Algorithm::DEBUG = true;
+
 
 	$got = self::runOpMulti($geoms, $op);
 	$got_normalized = MR\GJTools::ringsToCoordinates($got);

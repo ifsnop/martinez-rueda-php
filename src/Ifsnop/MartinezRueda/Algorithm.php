@@ -33,201 +33,115 @@ class Algorithm {
 	$chains = [];
 	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 
-	if (false) print("NEWTEST") . PHP_EOL;
-	if (false) print_r($segments);
-
 	foreach ($segments as $k => $segment) {
-	    if (false) print __METHOD__ . "::segment=BEGIN k($k) count(segments)=" . count($segments) . PHP_EOL;
-	    if (false) print_r($segment);
 	    $point1 = $segment->start;
 	    $point2 = $segment->end;
-	    if ($point1 == $point2) {
-		if (false) print "point1 == point2" . PHP_EOL;
+	    if ($point1->__eq($point2)) {
 		continue;
 	    }
 
 	    $segmentChainerMatcher = new SegmentChainerMatcher();
 
 	    for ($i = 0; $i < count($chains); $i++) {
-		if (false) print "for $i count(chains)=" . count($chains) . PHP_EOL;
-		if (false) print __METHOD__ . "::chains=BEGIN ($i)" . PHP_EOL;
-		if (false) var_dump($chains);
 		$chain = &$chains[$i];
-
 		$head = $chain[0];
 		$tail = end($chain);
-		if (false) print __METHOD__ . "::HEAD=BEGIN ($i)";
-		if (false) print_r($head);
-		if (false) print __METHOD__ . "::POINT1=BEGIN ($i)";
-		if (false) print_r($point1);
-		if ($head == $point1) {
+
+		if ($head->__eq($point1)) {
 		    if ($segmentChainerMatcher->setMatch($i, true, true)) {
-			if (false) print __METHOD__ . "::A1 i($i)" . PHP_EOL;
 			break;
 		    }
-		    if (false) print __METHOD__ . "::A2 i($i)" . PHP_EOL;
-		} elseif ($head == $point2) {
+		} elseif ($head->__eq($point2)) {
 		    if ($segmentChainerMatcher->setMatch($i, true, false)) {
-			if (false) print __METHOD__ . "::A3 i($i)" . PHP_EOL;
 			break;
 		    }
-		    if (false) print __METHOD__ . "::A4 i($i)" . PHP_EOL;
-		} elseif ($tail == $point1) {
+		} elseif ($tail->__eq($point1)) {
 		    if ($segmentChainerMatcher->setMatch($i, false, true)) {
-			if (false) print __METHOD__ . "::A5 i($i)" . PHP_EOL;
 			break;
 		    }
-		    if (false) print __METHOD__ . "::A6 i($i)" . PHP_EOL;
-		} elseif ($tail == $point2) {
+		} elseif ($tail->__eq($point2)) {
 		    if ($segmentChainerMatcher->setMatch($i, false, false)) {
-			if (false) print __METHOD__ . "::A7 i($i)" . PHP_EOL;
 			break;
 		    }
-		    if (false) print __METHOD__ . "::A8 i($i)" . PHP_EOL;
 		}
-		if (false) print __METHOD__ . "::A9 i($i)" . PHP_EOL;
-		if (false) print __METHOD__ . "::segmentChainerMatcher=BEGIN ($i)" . PHP_EOL;
-		if (false) var_dump($segmentChainerMatcher);
-		if (false) print __METHOD__ . "::segmentChainerMatcher=END ($i)" . PHP_EOL;
 	    }
 
-	    if (false) print __METHOD__ . "::A10 k($k)" . PHP_EOL;
 	    if ($segmentChainerMatcher->nextMatch === $segmentChainerMatcher->firstMatch) {
-		if (false) print __METHOD__ . "::A11 k($k)" . PHP_EOL;
-		if (false) print __METHOD__ . "::chains=APPEND k($k)" . PHP_EOL;
 		$chains[] = [$point1, $point2];
-		if (false) print __METHOD__ . "::chains=BEGIN k($k)" . PHP_EOL;
-		if (false) print_r($chains);
-		if (false) print __METHOD__ . "::chains=END k($k)" . PHP_EOL;
 		continue;
 	    }
 
-	    if (false) print __METHOD__ . "::A12 k($k)" . PHP_EOL;
 	    if ($segmentChainerMatcher->nextMatch === $segmentChainerMatcher->secondMatch) {
-		if (false) print __METHOD__ . "::A13 k($k)" . PHP_EOL;
 		$index = $segmentChainerMatcher->firstMatch->index;
 		$point = $segmentChainerMatcher->firstMatch->matchesPt1 ? $point2 : $point1;
 		$addToHead = $segmentChainerMatcher->firstMatch->matchesHead;
-
-		if (false) print __METHOD__ . "::addToHead=" . $addToHead . "  k($k)" . PHP_EOL;
 
 		$chain = &$chains[$index];
 		$grow = $addToHead ? $chain[0] : end($chain);
 		$grow2 = $addToHead ? $chain[1] : $chain[count($chain) - 2];
 		$opposite = $addToHead ? end($chain) : $chain[0];
 		$opposite2 = $addToHead ? $chain[count($chain) - 2] : $chain[1];
-		if (false) print __METHOD__ . "::A14 k($k)" . PHP_EOL;
 		if (Point::collinear($grow2, $grow, $point)) {
-		    if (false) print __METHOD__ . "::A15 k($k)" . PHP_EOL;
 		    if ($addToHead) {
-			if (false) print __METHOD__ . "::A16 k($k)" . PHP_EOL;
 			array_shift($chain);
 		    } else {
-			if (false) print __METHOD__ . "::A17 k($k)" . PHP_EOL;
 			array_pop($chain);
 		    }
 		    $grow = $grow2;
-		    if (false) print __METHOD__ . "::A18 k($k)" . PHP_EOL;
 		}
-		if (false) print __METHOD__ . "::A19 k($k)" . PHP_EOL;
 		if ($opposite == $point) {
-		    if (false) print __METHOD__ . "::A20 k($k)" . PHP_EOL;
 		    array_splice($chains, $index, 1);
 		    if (Point::collinear($opposite2, $opposite, $grow)) {
-			if (false) print __METHOD__ . "::A21 k($k)" . PHP_EOL;
 			if ($addToHead) {
-			    if (false) print __METHOD__ . "::A22 k($k)" . PHP_EOL;
 			    array_pop($chain);
 			} else {
-			    if (false) print __METHOD__ . "::A23 k($k)" . PHP_EOL;
 			    array_shift($chain);
 			}
 		    }
-		    if (false) print __METHOD__ . "::A24 k($k)" . PHP_EOL;
 		    $regions[] = $chain;
 		    continue;
 		}
-		if (false) print __METHOD__ . "::A25 k($k)" . PHP_EOL;
-		if (false) print __METHOD__ . "::chains BEGIN scm.next is scrm.secondmatch3 k($k)" . PHP_EOL;
-		if (false) var_dump($chains);
-
 		if ($addToHead) {
-		    if (false) print __METHOD__ . "::A26 k($k)" . PHP_EOL;
-		    if (false) print_r($point);
-		    if (false) var_dump($chain);
 		    $ret = array_unshift($chain, $point);
-		    if (false) var_dump($chain);
-		    if (false) print "RET=$ret" . PHP_EOL;
-		    if (false) print __METHOD__ . "::chains BEGIN scm.next is scrm.secondmatch4 k($k)" . PHP_EOL;
-		    if (false) var_dump($chains);
 		} else {
-		    if (false) print __METHOD__ . "::A27 k($k)" . PHP_EOL;
 		    $chain[] = $point;
 		}
-		if (false) print __METHOD__ . "::A28 k($k) count(chains)=" . count($chains) . PHP_EOL;
 		continue; // esto cambia de segmento
 	    }
-	    if (false) print __METHOD__ . "::A29 k($k)" . PHP_EOL;
-	    if (false) print __METHOD__ . "::A30 k($k)" . PHP_EOL;
 	    $firstIndex = $segmentChainerMatcher->firstMatch->index;
 	    $secondIndex = $segmentChainerMatcher->secondMatch->index;
 
 	    $reverseFirst = count($chains[$firstIndex]) < count($chains[$secondIndex]);
 	    if ($segmentChainerMatcher->firstMatch->matchesHead) {
-		if (false) print __METHOD__ . "::A31 k($k)" . PHP_EOL;
 		if ($segmentChainerMatcher->secondMatch->matchesHead) {
-		    if (false) print __METHOD__ . "::A32 k($k)" . PHP_EOL;
 		    if ($reverseFirst) {
-			if (false) print __METHOD__ . "::A33 k($k)" . PHP_EOL;
-			if (false) print_r($chains[$firstIndex]);
 			self::reverseChain($chains, $firstIndex);
-			if (false) print_r($chains[$firstIndex]);
 			self::appendChain($chains, $firstIndex, $secondIndex);
 		    } else {
-			if (false) print __METHOD__ . "::A34 k($k)" . PHP_EOL;
 			self::reverseChain($chains, $secondIndex);
 			self::appendChain($chains, $secondIndex, $firstIndex);
 		    }
-		    if (false) print __METHOD__ . "::A35 k($k)" . PHP_EOL;
 		} else {
-		    if (false) print __METHOD__ . "::A36 k($k)" . PHP_EOL;
 		    self::appendChain($chains, $secondIndex, $firstIndex);
 		}
 	    } else {
-		if (false) print __METHOD__ . "::A37 k($k)" . PHP_EOL;
 		if ($segmentChainerMatcher->secondMatch->matchesHead) {
-		    if (false) print __METHOD__ . "::A38 k($k)" . PHP_EOL;
 		    self::appendChain($chains, $firstIndex, $secondIndex);
 		} else {
-		    if (false) print __METHOD__ . "::A39 k($k)" . PHP_EOL;
 		    if ($reverseFirst) {
-			if (false) print __METHOD__ . "::A40 k($k)" . PHP_EOL;
 			self::reverseChain($chains, $firstIndex);
 			self::appendChain($chains, $secondIndex, $firstIndex);
 		    } else {
-			if (false) print __METHOD__ . "::A41 k($k)" . PHP_EOL;
-			if (false) print_r($chains[$secondIndex]);
 			self::reverseChain($chains, $secondIndex);
-			if (false) print_r($chains[$secondIndex]);
 			self::appendChain($chains, $firstIndex, $secondIndex);
 		    }
-		    if (false) print __METHOD__ . "::A42 k($k)" . PHP_EOL;
 		}
-		if (false) print __METHOD__ . "::A43 k($k)" . PHP_EOL;
 	    }
-	    if (false) print __METHOD__ . "::A44 k($k)" . PHP_EOL;
 	}
-	if (false) print __METHOD__ . "::A45 k($k)" . PHP_EOL;
-	if (false) print __METHOD__ . "::regions=BEGIN" . PHP_EOL;
-	if (false) print_r($regions);
-	if (false) print __METHOD__ . "::regions=END" . PHP_EOL;
 	return $regions;
     }
 
     public static function __select(array $segments, array $selection): array {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-	//print_r($segments); // IFSNOP
-	//print_r($selection);
 	$result = [];
 	foreach ($segments as $segment) {
 	    $index = (
@@ -271,6 +185,8 @@ class Algorithm {
 	);
     }
 
+/*
+
     public static function selectUnion($combinedPolySegments) {
 	return new PolySegments(
 	    segments: self::__select(
@@ -284,6 +200,60 @@ class Algorithm {
 	    isInverted: ($combinedPolySegments->isInverted1 || $combinedPolySegments->isInverted2)
 	);
     }
+*/
+
+    /**
+     * Selección específica para UNIÓN (A ∪ B) sin tabla.
+     * Mantiene el segmento si (resAbove XOR resBelow), donde
+     * resSide = (myFill.side || otherFill.side).
+     * Además, fija myFill del segmento resultante como (below=resBelow, above=resAbove)
+     * para que el chainer pueda entender la orientación del interior del resultado.
+     */
+    private static function __selectUnionLogical(array $segments): array
+    {
+        $result = [];
+
+        foreach ($segments as $segment) {
+            // Asegurar objetos Fill, tratar null como false
+            $my = $segment->myFill ?? new Fill(null, null);
+            $ot = $segment->otherFill;
+
+            $myA = (bool)($my->above);
+            $myB = (bool)($my->below);
+            $otA = (bool)($ot?->above);
+            $otB = (bool)($ot?->below);
+
+            // Interior del resultado a cada lado
+            $resA = ($myA || $otA);
+            $resB = ($myB || $otB);
+
+            if ($resA !== $resB) {
+                // Conservar: es frontera de la unión.
+                // Fijamos Fill para el resultado (útil para posteriores fases)
+                $result[] = new Segment(
+                    start:  $segment->start,
+                    end:    $segment->end,
+                    myFill: new Fill($resB, $resA) // below=resB, above=resA
+                );
+            }
+        }
+
+        return $result;
+    }
+
+    public static function selectUnion($combinedPolySegments)
+    {
+        // Sustituimos la versión con tabla por la lógica directa
+        $selected = self::__selectUnionLogical($combinedPolySegments->combined);
+
+        return new PolySegments(
+            segments:   $selected,
+            isInverted: ($combinedPolySegments->isInverted1 || $combinedPolySegments->isInverted2)
+        );
+    }
+
+
+
 
     public static function selectIntersect($combinedPolySegments) {
 	return new PolySegments(
@@ -342,14 +312,12 @@ class Algorithm {
     }
 
     public static function polygon($segments) {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	$s = self::segmentChainer($segments->segments);
 	$p = Polygon::create()->fillFromArray($s , $segments->isInverted);
 	return $p;
     }
 
     public static function __operate($polygon1, $polygon2, $selector) {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	$firstPolygonRegions = self::segments($polygon1);
 	$secondPolygonRegions = self::segments($polygon2);
 	$combinedSegments = self::combine($firstPolygonRegions, $secondPolygonRegions);
@@ -360,7 +328,6 @@ class Algorithm {
 
     // helper functions for common operations
     public static function union(...$args):Polygon {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	if (count($args) === 1 && is_array($args[0])) {
 	    $polygons = $args[0];
 	    $firstSegments = self::segments($polygons[0]);
@@ -394,7 +361,6 @@ class Algorithm {
     public static function xoring($polygon1, $polygon2) {
 	return self::__operate($polygon1, $polygon2, 'selectXor');
     }
-
     public static function arrays_are_equal(array $a1, array $a2): bool {
 	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	if (count($a1) !== count($a2)) {
@@ -415,33 +381,6 @@ class Algorithm {
 	return true; // Si todo coincide, los arrays son iguales
     }
 
-    public static function arrays_are_similar(array $a1, array $a2): bool {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-	if (count($a1) !== count($a2)) {
-	    // print "distinto tamaño " . count($a1) .  " " . count($a2) . PHP_EOL;
-	    return false; // Si tienen diferentes tamaños, no son iguales
-	}
-
-	foreach ($a1 as $key => $value) {
-	    if (!array_key_exists($key, $a2)) {
-		// print "falta clave" . PHP_EOL;
-		return false; // Si una clave falta en $a2, no son iguales
-	    }
-
-	    if (is_array($value) && is_array($a2[$key])) {
-		if (!arrays_are_similar($value, $a2[$key])) {
-		    return false; // Llamada recursiva para comparar subarrays
-		}
-	    } else {
-		$diff = abs($value - $a2[$key]);
-		if ( $diff > self::$tolerance ) {
-		    // print $diff . PHP_EOL;
-		    return false; // Si los valores son distintos, no son iguales
-		}
-	    }
-	}
-	return true; // Si todo coincide, los arrays son iguales
-    }
 }
 
 /*

@@ -20,7 +20,7 @@ class RegionIntersecter extends Intersecter {
             }
 
             $segment = $this->newSegment(
-                $forward < 0 ? $point1 : $point2, 
+                $forward < 0 ? $point1 : $point2,
                 $forward < 0 ? $point2 : $point1
             );
 
