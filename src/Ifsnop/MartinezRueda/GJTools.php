@@ -127,7 +127,7 @@ final class GJTools
         return ['type' => 'MultiPolygon', 'coordinates' => $polygons];
     }
 
-    private static function almostEq(float $a, float $b): bool {
+    public static function almostEq(float $a, float $b): bool {
 	return abs($a-$b) <= Algorithm::TOLERANCE;
     }
 
@@ -533,5 +533,85 @@ public static function removeColinearPointsFromPolygon($polygonCoords):array {
     {
         return ($area < 0.0) ? $ring : array_reverse($ring);
     }
-}
 
+    /**
+     * Compara dos arrays de coordenadas estilo MultiPolygon (p.ej. salida de ringsToCoordinates):
+     * [ polygon1, polygon2, ... ], cada polygon = [ exterior, hole1, ... ], cada ring = [ [x,y], ... ]
+     *
+     * @param array      $coordsA
+     * @param array      $coordsB
+     * @param array|null $diff            (salida) detalles del primer desacuerdo encontrado.
+     * @return bool
+     */
+    public static function compareCoordinates(
+        array $coordsA,
+        array $coordsB,
+        ?array &$diff = null
+    ): bool {
+        $diff = null;
+
+        // 1) Nº de polígonos
+        $na = count($coordsA);
+        $nb = count($coordsB);
+        if ($na !== $nb) {
+            $diff = ['where' => 'polygon_count', 'a' => $na, 'b' => $nb];
+	    //print "ABORT1" . PHP_EOL;
+            return false;
+        }
+
+        // 2) Iterar polígonos, anillos y puntos
+        for ($p = 0; $p < $na; $p++) {
+            $polyA = $coordsA[$p];
+            $polyB = $coordsB[$p];
+
+            $ra = count($polyA);
+            $rb = count($polyB);
+            if ($ra !== $rb) {
+                $diff = ['where' => 'ring_count', 'polygon' => $p, 'a' => $ra, 'b' => $rb];
+		// print "ABORT2" . PHP_EOL;
+                return false;
+            }
+
+            for ($r = 0; $r < $ra; $r++) {
+                $ringA = $polyA[$r];
+                $ringB = $polyB[$r];
+
+                $pa = count($ringA);
+                $pb = count($ringB);
+                if ($pa !== $pb) {
+                    $diff = ['where' => 'point_count', 'polygon' => $p, 'ring' => $r, 'a' => $pa, 'b' => $pb];
+		    // print "ABORT3" . PHP_EOL;
+                    return false;
+                }
+
+                // Punto a punto
+                for ($k = 0; $k < $pa; $k++) {
+                    $ax = (float)$ringA[$k][0]; $ay = (float)$ringA[$k][1];
+                    $bx = (float)$ringB[$k][0]; $by = (float)$ringB[$k][1];
+
+                    if (!self::almostEq($ax, $bx)) {
+                        $diff = [
+                            'where'   => 'point_x',
+                            'polygon' => $p, 'ring' => $r, 'point' => $k,
+                            'a' => $ax, 'b' => $bx
+                        ];
+			// print "ABORT4" . PHP_EOL;
+                        return false;
+                    }
+                    if (!self::almostEq($ay, $by)) {
+                        $diff = [
+                            'where'   => 'point_y',
+                            'polygon' => $p, 'ring' => $r, 'point' => $k,
+                            'a' => $ay, 'b' => $by
+                        ];
+			// print "ABORT5" . PHP_EOL;
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+}
