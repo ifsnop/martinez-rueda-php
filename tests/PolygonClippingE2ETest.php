@@ -200,7 +200,7 @@ final class PolygonClippingE2ETest extends TestCase
     public static function provideAllCases(): array {
         $root = self::fixturesRoot();
         $ops  = self::opsFilter();
-        $max  = 36; //self::maxCases();
+        $max  = 42; //self::maxCases();
 
         $datasets = [];
         $dirs = @scandir($root);
@@ -211,6 +211,9 @@ final class PolygonClippingE2ETest extends TestCase
         foreach ($dirs as $d) {
 
 	//    if ( false === strpos($d, "issue-60-8") )
+	//	continue;
+
+	//    if ( false === strpos($d, "dont-consume-prev-segment-3") )
 	//	continue;
 
             if ($d === '.' || $d === '..') continue;
@@ -261,17 +264,18 @@ final class PolygonClippingE2ETest extends TestCase
      */
     public function testEndToEnd(string $label, string $op, string $argsPath, string $expectedPath): void {
 
-	print "label: $label" . PHP_EOL;
-	print "op: $op" . PHP_EOL;
-	print "argsPath: $argsPath" . PHP_EOL;
-	print "expectedPath: $expectedPath" . PHP_EOL;
+//	print "label: $label" . PHP_EOL;
+//	print "op: $op" . PHP_EOL;
+//	print "argsPath: $argsPath" . PHP_EOL;
+//	print "expectedPath: $expectedPath" . PHP_EOL;
         $argsGJ = self::readGeoJSON($argsPath);
         $geoms  = self::geomsFromGeoJSON($argsGJ);
-	print "count geoms: " . count($geoms) . PHP_EOL;
+//	print "count geoms: " . count($geoms) . PHP_EOL;
         if (count($geoms) < 2) {
             $this->markTestSkipped("[$label] args sin geometrías: $argsPath");
         }
-	foreach($geoms as $k => $g) print "$k: " . json_encode($g) . PHP_EOL;
+	$input = "";
+	foreach($geoms as $k => $g) $input .= "\t$k: " . json_encode($g) . PHP_EOL;
 
 	
 	// Activa el modo debug
@@ -286,12 +290,11 @@ final class PolygonClippingE2ETest extends TestCase
         $exp        = isset($expGeoms[0]) ? $expGeoms[0] : []; // MultiPolygon vacío si corresponde
 	$exp_normalized = MR\GJTools::fixGeometries($exp);
 	$exp_normalized = MR\GJTools::canonicalizePolygons($exp_normalized, (int)abs(floor(log10(abs(MR\Algorithm::TOLERANCE)))));
-        
 
 	//print "got  : " . json_encode($got) . PHP_EOL;
 	//print "exp  : " . json_encode($exp) . PHP_EOL . PHP_EOL;
-	print "exp_n: " . json_encode($exp_normalized) . PHP_EOL . PHP_EOL;
-	print "got_n: " . json_encode($got_normalized) . PHP_EOL;
+//	print "exp_n: " . json_encode($exp_normalized) . PHP_EOL;
+//	print "got_n: " . json_encode($got_normalized) . PHP_EOL;
 	//print "got  : " . json_encode($got) . PHP_EOL;
 	$diff = [];
 	//$ret = self::compareCoordinates($got_normalized, $exp_normalized, $diff);
@@ -302,9 +305,10 @@ final class PolygonClippingE2ETest extends TestCase
         $this->assertTrue(
 	    self::compareCoordinates($got_normalized, $exp_normalized, $diff),
             "Diferencia detectada" . PHP_EOL .
-            "got (recortado):      " . json_encode($got_normalized) . PHP_EOL .
-            "expected (recortado): " . json_encode($exp_normalized) . PHP_EOL .
-	    "diff: " . json_encode($diff) . PHP_EOL
+	    "input" . PHP_EOL . $input .PHP_EOL .
+            "got (recortado)" . PHP_EOL . "\t" . json_encode($got_normalized) . PHP_EOL .
+            "expected (recortado)" . PHP_EOL . "\t" . json_encode($exp_normalized) . PHP_EOL .
+	    "diff" . PHP_EOL . "\t" . json_encode($diff) . PHP_EOL
         );
     }
 }

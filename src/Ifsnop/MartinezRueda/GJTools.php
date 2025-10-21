@@ -38,12 +38,14 @@ final class GJTools
 	    // $ring = self::removeCollinear($ring);
 	    $ring = self::removeColinearPointsFromPolygon($ring);
             $ring = self::closeRing($ring);
-            if (count($ring) < 4) { // 3 vértices + cierre
+            // $ring = self::openRing($ring);
+            if (count($ring) < 4) { // 4) { // 3 vértices + cierre
                 throw new \InvalidArgumentException("Anillo $idx inválido: menos de 3 vértices.");
             }
             $R[$idx] = $ring;
             $areas[$idx] = self::signedArea($ring);
             $bboxes[$idx] = self::bbox($ring);
+	    Debug::log("  Calculated adaptative Epsilon for Ring $idx: " . self::adaptiveEpsilon($bboxes[$idx]) );
         }
 
         $n = count($R);
@@ -188,6 +190,7 @@ final class GJTools
 		$ring = self::dedupConsecutive($ring);
 		$ring = self::removeColinearPointsFromPolygon($ring);
 		$ring = self::closeRing($ring);
+		//$ring = self::openRing($ring);
 		//print "RING&HOLES $idx]" . json_encode($ring) . PHP_EOL;
 		$rings[] = $ring;
 	    }
@@ -404,6 +407,27 @@ public static function removeColinearPointsFromPolygon($polygonCoords):array {
     }
 
     /**
+     * Asegura que el anillo queda abierto (primer punto != último).
+     * @param array $ring
+     * @return array
+     */
+    private static function openRing(array $ring): array
+    {
+        if (!is_array($ring) || count($ring) < 3) {
+            throw new \InvalidArgumentException("Anillo inválido.");
+        }
+        $first = $ring[0];
+        $last  = $ring[count($ring) - 1];
+	print json_encode($ring) . PHP_EOL;
+        if ($first[0] === $last[0] && $first[1] === $last[1]) {
+            unset($ring[count($ring) - 1]);
+        }
+	print json_encode($ring) . PHP_EOL;
+        // $ring[] = [$first[0], $first[1]];
+        return $ring;
+    }
+
+    /**
      * Área con signo (shoelace). CCW => área > 0, CW => área < 0.
      * @param array $ring
      * @return float
@@ -418,6 +442,46 @@ public static function removeColinearPointsFromPolygon($polygonCoords):array {
             $a += ($x1 * $y2 - $x2 * $y1);
         }
         return $a / 2.0;
+    }
+
+    /**
+     * Calcula tolerancia adaptativa a partir de un conjunto de puntos.
+     *
+     * @param array<Point>|array<Segment>|Polygon|array $input  Conjunto de datos
+     * @param float $epsAbsMin  Umbral absoluto mínimo (p. ej., 1e-12)
+     * @param float $epsRel     Proporcional a la escala del dataset (p. ej., 1e-12)
+     * @param float $epsMax     Cota superior para evitar sobre-aglutinar (p. ej., 1e-6)
+     * @return float            Tolerancia recomendada
+     */
+    public static function adaptiveEpsilon(array $bboxes): float 
+    {
+/*
+        float $epsAbsMin = 1e-12,
+        float $epsRel    = 1e-12,
+        float $epsMax    = 1e-6
+*/
+        $epsAbsMin = 1e-12;
+        $epsRel    = 1e-12;
+        $epsMax    = 1e-6;
+
+
+	$maxX = $bboxes['maxX']; $maxY = $bboxes['maxY'];
+	$minX = $bboxes['minX']; $minY = $bboxes['minY'];
+
+	$dx = $maxX - $minX;
+        $dy = $maxY - $minY;
+        $diag = \sqrt($dx*$dx + $dy*$dy);
+
+        // Escala representativa: diagonal del bbox o magnitud de coordenadas
+        $mag = \max(\abs($minX), \abs($maxX), \abs($minY), \abs($maxY));
+        $scale = \max($diag, $mag, 1.0); // evitar 0
+
+        // Epsilon base
+        $eps = \max($epsAbsMin, $epsRel * $scale);
+
+        // Clamp superior de seguridad
+        if ($eps > $epsMax) $eps = $epsMax;
+        return $eps;
     }
 
     /**

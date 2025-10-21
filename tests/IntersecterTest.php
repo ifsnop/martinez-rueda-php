@@ -403,7 +403,8 @@ class IntersecterTest extends TestCase
         // Crear un segmento por debajo de TOLERANCE (causará error)
         $segment = $this->intersecter->newSegment(
             new Point(0.0, 0.0),
-            new Point(1e-11, 1e-11)  // Menor que TOLERANCE
+            new Point(Algorithm::TOLERANCE/100.0,
+		Algorithm::TOLERANCE/100.0)  // Menor que TOLERANCE
         );
         
         $this->intersecter->eventAddSegment($segment, primary: true);

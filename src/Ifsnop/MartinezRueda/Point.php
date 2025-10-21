@@ -65,6 +65,7 @@ class Point {
      * Verifica si un punto está entre dos puntos dados (en la línea definida por ellos).
      * Utiliza producto escalar para proyectar el punto y comprobar si está dentro del segmento.
      */
+/*
     public static function between(Point $point, Point $left, Point $right) {
         $dPyLy = $point->y - $left->y;
         $dRxLx = $right->x - $left->x;
@@ -85,6 +86,57 @@ class Point {
         }
 
         return true;
+    }
+*/
+
+    /*
+     * Verifica si un punto está entre dos puntos dados (en la línea definida por ellos).
+     * Utiliza producto escalar para proyectar el punto y comprobar si está dentro del segmento.
+     * Versión exclusiva (t € (0,1)) y colineal (recomendada para booleanas)
+     */
+    public static function between(Point $p, Point $a, Point $b): bool
+    {
+/*
+	$abx = $b->x - $a->x; $aby = $b->y - $a->y;
+	$apx = $p->x - $a->x; $apy = $p->y - $a->y;
+
+	$eps = Algorithm::TOLERANCE;
+
+	// 0) Segmento degenerado (a≈b): no hay "entre".
+	$sqlen = $abx*$abx + $aby*$aby;
+	if ($sqlen <= $eps*$eps) return false;
+
+	// 1) Colinealidad con tolerancia relativa (área del paralelogramo ~ 0)
+	$cross = $abx*$apy - $aby*$apx;
+	$scale = max(1.0, sqrt($sqlen));
+	if (abs($cross) > $eps * $scale) return false;
+
+	// 2) Parámetro t sobre AB
+	$t = ($apx*$abx + $apy*$aby) / $sqlen;
+
+	// 3) Exclusivo, con margen eps
+	return ($t > 0.0 + $eps) && ($t < 1.0 - $eps);
+*/
+    $abx = $b->x - $a->x; $aby = $b->y - $a->y;
+    $apx = $p->x - $a->x; $apy = $p->y - $a->y;
+    $eps = Algorithm::TOLERANCE;
+
+
+    $sqlen = $abx*$abx + $aby*$aby;
+    if ($sqlen == 0.0) return false;
+    $len = sqrt($sqlen);
+
+    // Colinealidad robusta
+    $cross = $abx*$apy - $aby*$apx;
+    $epsGeom = max(1.0, $len) * (1.0 * $eps);
+    if (abs($cross) > $epsGeom) return false;
+
+    $t = ($apx*$abx + $apy*$aby) / $sqlen;
+
+    // Exclusión paramétrica equivalente a distancia T
+    $tTol = $eps / $len; // <-- clave
+    return ($t > 0.0 + $tTol) && ($t < 1.0 - $tTol);
+
     }
 
     /*
