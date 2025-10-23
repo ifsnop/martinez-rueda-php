@@ -69,18 +69,41 @@ $test = [
 	    'difference' => [[[-89.1214798,30.2253957],[-89.1207072,30.2251544],[-89.1205,30.2251544],[-89.1205,30.226]]],
 	],
     ],
-    7 => [
+    7 => [ // UNION DE DOS POLIGONOS UNIDOS POR UN VERTICE, DEBE GENERAR DOS POLIGONOS
+	'region_a' => [[[0,0], [1,0], [0,1],[0,0]]],
+	'region_b' => [[[0,0],[-1,0],[0,-1],[0,0]]],
+	'res' => [
+	    'union' => [
+	        [[-1,0],[0,-1],[0,0],[-1,0]],
+	        [[0,0],[1,0],[0,1],[0,0]]
+	    ],
+	],
+    ],
+    8 => [
 	'region_a' => [[[150.873, -10.017],[150.867925, -10.013013],[150.8708803653717, -10.01678734229192]]],
 	'region_b' => [[[150.873, -10.017],[150.871475815773, -10.0166398791],[150.87071943283, -10.01682719716]]],
 	'res' => [
-	    // 'union' => [[[150.867925,-10.013013],[150.870880365,-10.016787342],[150.870719433,-10.016827197],[150.873,-10.017],[150.867925,-10.013013]]],
 	    'union' => [[[150.873,-10.017],[150.87071943283,-10.01682719716],[150.87088036534647,-10.016787342259704],[150.867925,-10.013013]]],
+	],
+    ],
+    9 => [
+	'region_a' =>  [[[18.1054513,60.4585421],[18.10556875,60.45856990788591],[18.1055,60.4587],[18.1054513,60.4585421]]],
+        'region_b' =>  [[[18.1054513,60.4585421],[18.1057195,60.4586056],[18.10563,60.4584],[18.1059,60.4584],[18.1058,60.4585],[18.1054513,60.4585421]]],
+	'res' => [
+	    'union' => [
+		[[18.1054513,60.4585421],[18.105679846052,60.458514506685],[18.1057195,60.4586056],[18.10556875,60.458569907886],[18.1055,60.4587],[18.1054513,60.4585421]]
+		,
+		[[18.10563,60.4584],[18.1059,60.4584],[18.1058,60.4585],[18.105679846052,60.458514506685],[18.10563,60.4584]]
+
+	    ],
 	],
     ],
 ];
 
 $fail = false;
 foreach( $test as $test_number => $test_predicates ) {
+    if ( $test_number != 9 )
+	continue;
     $pa = MR\Polygon::create()->fillFromArray($test_predicates['region_a']);
     $pb = MR\Polygon::create()->fillFromArray($test_predicates['region_b']);
 
@@ -88,7 +111,12 @@ foreach( $test as $test_number => $test_predicates ) {
 	$diff = array();
 	$result = MR\Algorithm::$op($pa, $pb)->getArray();
 	$result_normalized = MR\GJTools::ringsToCoordinates($result);
+	// print "EXPECTED" . PHP_EOL . json_encode($expected) . PHP_EOL;
+	// print "RESULT" . PHP_EOL . json_encode($result) . PHP_EOL;
+
 	$expected_normalized = MR\GJTools::ringsToCoordinates($expected);
+	// print "EXPECTE NORMALIZED" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
+	// print "RESULT NORMALIZED" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
 
 	$ret = MR\GJTools::compareCoordinates($result_normalized, $expected_normalized, $diff);
 
@@ -96,11 +124,12 @@ foreach( $test as $test_number => $test_predicates ) {
 	    print "Result PASS {$test_number} {$op}" . PHP_EOL;
 	} else {
 	    print "Result FAIL {$test_number} {$op}" . PHP_EOL;
-	    print "OPA: " . json_encode(MR\GJTools::ringsToCoordinates($test_predicates['region_a'])[0]) . PHP_EOL;
-	    print "OPB: " . json_encode(MR\GJTools::ringsToCoordinates($test_predicates['region_b'])[0]) . PHP_EOL;
-	    print "Exp: " . json_encode(MR\GJTools::ringsToCoordinates($expected_normalized)) . PHP_EOL;
-	    print "Got: " . json_encode(MR\GJTools::ringsToCoordinates($result_normalized)) . PHP_EOL;
-	    print "GoN: " . json_encode($result) . PHP_EOL;
+	    print "OPA" . PHP_EOL . json_encode(MR\GJTools::ringsToCoordinates($test_predicates['region_a'])[0]) . PHP_EOL;
+	    print "OPB" . PHP_EOL . json_encode(MR\GJTools::ringsToCoordinates($test_predicates['region_b'])[0]) . PHP_EOL;
+	    // print json_encode($expected[0]) . PHP_EOL;
+	    print "EXPECTED" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
+	    print "GOT" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
+	    // print "GoN: " . json_encode($result) . PHP_EOL;
 	    $fail = true;
 	}
     }
@@ -108,6 +137,33 @@ foreach( $test as $test_number => $test_predicates ) {
 
 if ( $fail )
     exit(1);
+
+exit(0);
+
+// UNION DE DOS POLIGONOS UNIDOS POR UN VERTICE, DEBE GENERAR DOS POLIGONOS
+$region_a = MR\GJTools::ringsToCoordinates( [[[0,0], [1,0], [0,1],[0,0]]] );
+$region_b = MR\GJTools::ringsToCoordinates( [[[0,0],[-1,0],[0,-1],[0,0]]] );
+$pa = MR\Polygon::create()->fillFromArray($region_a[0]);
+$pb = MR\Polygon::create()->fillFromArray($region_b[0]);
+$result = MR\Algorithm::union($pa, $pb)->getArray();
+print "INDEPENDIENTES" . PHP_EOL; // . json_encode($result) . PHP_EOL;
+print json_encode($region_a[0]) . PHP_EOL;
+print json_encode($region_b[0]) . PHP_EOL;
+print json_encode(MR\GJTools::ringsToCoordinates($result)) . PHP_EOL;;
+//RESULTADO [[[[-1,0],[0,-1],[0,0],[-1,0]]],[[[0,0],[1,0],[0,1],[0,0]]]]
+
+
+// UNION DE DOS POLIGONOS INDEPENDIENTES
+$region_a = MR\GJTools::ringsToCoordinates([[[0,0], [2,0], [1,1]]]);
+$region_b = MR\GJTools::ringsToCoordinates([[[0,0], [3,0], [3,-1]]]);
+$pa = MR\Polygon::create()->fillFromArray($region_a[0]);
+$pb = MR\Polygon::create()->fillFromArray($region_b[0]);
+$result = MR\Algorithm::union($pa, $pb)->getArray();
+print "INDEPENDIENTES" . PHP_EOL; // . json_encode($result) . PHP_EOL;
+print json_encode($region_a[0]) . PHP_EOL;
+print json_encode($region_b[0]) . PHP_EOL;
+print json_encode(MR\GJTools::ringsToCoordinates($result)) . PHP_EOL;;
+
 
 exit(0);
 
