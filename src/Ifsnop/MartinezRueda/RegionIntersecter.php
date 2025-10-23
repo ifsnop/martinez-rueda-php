@@ -31,4 +31,10 @@ class RegionIntersecter extends Intersecter {
     public function calculate2(bool $isInverted) {
         return parent::calculate($isInverted, false);
     }
+
+    /** Conveniencia: exponer los vértices TOUCH marcados por Intersecter */
+    public function getTouchVertices(): array {
+        return parent::getTouchVertices(); // asegúrate de tener este getter en Intersecter
+    }
+
 }

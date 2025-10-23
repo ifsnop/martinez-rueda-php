@@ -8,12 +8,17 @@ class Segment {
     public $myFill;
     public $otherFill;
 
-    public function __construct(Point $start, Point $end, Fill $myFill = null, Fill $otherFill = null) {
+    /** true = polígono A (primary), false = polígono B (secondary) */
+    public ?bool $sourcePrimary = null;
+
+
+    public function __construct(Point $start, Point $end, Fill $myFill = null, Fill $otherFill = null,?bool $sourcePrimary = null) {
 	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	$this->start = $start;
 	$this->end = $end;
 	$this->myFill = $myFill;
 	$this->otherFill = $otherFill;
+	$this->sourcePrimary = $sourcePrimary;
     }
 
     public function __toString() {

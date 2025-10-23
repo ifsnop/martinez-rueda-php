@@ -225,6 +225,8 @@ final class GJTools
 
 public static function removeColinearPointsFromPolygon($polygonCoords):array {
 
+
+    print "removeColinearPointsFromPolygon: (" . count($polygonCoords) . ") " . json_encode($polygonCoords) . PHP_EOL;
     // Asegura que el anillo esté cerrado
     if ($polygonCoords[0] !== end($polygonCoords)) {
         $polygonCoords[] = $polygonCoords[0];

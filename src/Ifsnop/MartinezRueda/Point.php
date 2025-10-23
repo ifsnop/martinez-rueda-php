@@ -13,6 +13,10 @@ class Point {
         $this->y = $y;
     }
 
+    public function x(): float { return $this->x; }
+    public function y(): float { return $this->y; }
+
+
     /* Devuelve las coordenadas del punto como un array [x, y] */
     public function getArray(): array {
         return [$this->x, $this->y];

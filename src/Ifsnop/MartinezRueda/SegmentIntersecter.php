@@ -18,4 +18,12 @@ class SegmentIntersecter extends Intersecter {
 
         return parent::calculate($isInverted1, $isInverted2);
     }
+
+
+    /** Conveniencia: exponer los vértices TOUCH marcados por Intersecter */
+    public function getTouchVertices(): array {
+	return parent::getTouchVertices(); // asegúrate de tener este getter en Intersecter
+    }
+
+
 }

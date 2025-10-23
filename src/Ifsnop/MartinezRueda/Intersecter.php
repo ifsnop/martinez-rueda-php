@@ -5,21 +5,56 @@ namespace Ifsnop\MartinezRueda;
 class Intersecter {
     private $selfIntersection;
     private $eventRoot;
+    private array $touchVertices = []; // key -> true
+
+
+    private function key(Point $p): string {
+	return sprintf('%.12f,%.12f', $p->x(), $p->y());
+    }
+
+    private function markTouch(Point $p): void {
+	$this->touchVertices[$this->key($p)] = true;
+    }
+
+    public function getTouchVertices(): array { return $this->touchVertices; }
+
 
     public function __construct(bool $selfIntersection) {
         $this->selfIntersection = $selfIntersection;
         $this->eventRoot = new LinkedList();
     }
 
+
+
     public function newSegment(Point $start, Point $end): Segment {
         return new Segment(start: $start, end: $end, myFill: new Fill());
     }
-
+/*
     public function segmentCopy(Point $start, Point $end, Segment $seg): Segment {
         return new Segment(
-            start: $start, end: $end, myFill: new Fill($seg->myFill->below, $seg->myFill->above)
+            start: $start, end: $end, myFill: new Fill($seg->myFill->below, $seg->myFill->above), otherFill: $seg->otherFill, sourcePrimary: $seg->sourcePrimary
         );
     }
+*/
+public function segmentCopy(Point $start, Point $end, Segment $seg): Segment
+{
+    // Asegura myFill y otherFill para evitar NPEs
+    $my = $seg->myFill ?? new Fill(null, null);
+    $ot = $seg->otherFill ?? null;
+
+    // Crea copias (evita aliasing de objetos Fill)
+    $myCopy = new Fill($my->below, $my->above);
+    $otCopy = $ot ? new Fill($ot->below, $ot->above) : null;
+
+    return new Segment(
+        start:         $start,
+        end:           $end,
+        myFill:        $myCopy,
+        otherFill:     $otCopy,
+        // 👇 Propaga correctamente la identidad del operando
+        sourcePrimary: $seg->sourcePrimary
+    );
+}
 
 
     // Criterio END antes que START en empates de p11
@@ -101,7 +136,7 @@ class Intersecter {
 
 	// parche de copilot
 
-
+	// 1) Sanidad: no permitir segmentos degenerados
 	if ($segment->start->__eq($segment->end)) {
 	    throw new PolyBoolException(
 		"PolyBool: Zero-length segment detected; check input or adjust Algorithm::TOLERANCE"
@@ -109,18 +144,33 @@ class Intersecter {
 	}
 
 
+	// 2) Normaliza la orientación lexicográfica (x, luego y), usando tu comparador
+	//    (que aplica tolerancia). Si compare > 0, invierte.
+
 	// Si has procesado un evento de final (END) antes de que su evento de inicio (START)
 	//  hubiera sido insertado en la StatusList, por lo que $ev->status === null y lanza esa excepción.
 	// Zero-length segment detected.
 	// Normaliza el sentido del segmento: START = extremo "izquierdo" (o menor lexicográfico)
 	if (Point::compare($segment->start, $segment->end) > 0) {
-	    $tmp = $segment->start;
-	    $segment->start = $segment->end;
-	    $segment->end = $tmp;
+	    [ $segment->end, $segment->start] = [$segment->start, $segment->end];
+	    //$tmp = $segment->start;
+	    //$segment->start = $segment->end;
+	    //$segment->end = $tmp;
 	}
 
+
+	// 3) Asegura Fill propio (evitar null aguas abajo)
+	if ($segment->myFill === null) {
+	    $segment->myFill = new Fill(null, null);
+	}
+
+	// 4) Propaga identidad del operando (A=true / B=false) para etapas posteriores
+	$segment->sourcePrimary = $primary; // << conservar identidad // COPILOT
+
+	// 5) Inserta eventos de inicio/fin en la cola
 	$evStart = $this->eventAddSegmentStart($segment, $primary);
 	$this->eventAddSegmentEnd($evStart, $segment, $primary);
+
 	return $evStart;
     }
 
@@ -255,8 +305,18 @@ class Intersecter {
                 }
                 $this->eventDivide($ev2, $a1);
             }
-        } else { // $i != null
+        } else { // $i !== null
 		Debug::log("  → proper-xsec at %s (alongA=%d, alongB=%d)",Debug::p($i->point), $i->alongA, $i->alongB);
+
+
+
+		$isEndpointA = ($i->alongA === -1 || $i->alongA === 1);
+		$isEndpointB = ($i->alongB === -1 || $i->alongB === 1);
+		if ($isEndpointA && $isEndpointB) {
+		    $this->markTouch($i->point);
+		}
+
+
 
             if ($i->alongA == 0) {
                 if ($i->alongB == -1) {

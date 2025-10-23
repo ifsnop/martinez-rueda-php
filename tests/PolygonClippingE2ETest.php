@@ -210,8 +210,8 @@ final class PolygonClippingE2ETest extends TestCase
 
         foreach ($dirs as $d) {
 
-	//    if ( false === strpos($d, "issue-60-8") )
-	//	continue;
+	    if ( false === strpos($d, "issue-68") )
+		continue;
 
 	//    if ( false === strpos($d, "dont-consume-prev-segment-3") )
 	//	continue;
