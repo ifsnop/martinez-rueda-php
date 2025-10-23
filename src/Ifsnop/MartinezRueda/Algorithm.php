@@ -141,29 +141,6 @@ class Algorithm {
 	return $regions;
     }
 
-/*
-    public static function __select(array $segments, array $selection): array {
-	$result = [];
-	foreach ($segments as $segment) {
-	    $index = (
-		($segment->myFill->above ? 8 : 0) +
-		($segment->myFill->below ? 4 : 0) +
-		($segment->otherFill !== null && $segment->otherFill->above ? 2 : 0) +
-		($segment->otherFill !== null && $segment->otherFill->below ? 1 : 0)
-	    );
-
-	    if ($selection[$index] !== 0) {
-		$result[] = new Segment(
-		    start : $segment->start,
-		    end : $segment->end,
-		    myFill : new Fill($selection[$index] == 2, $selection[$index] == 1)
-		);
-	    }
-	}
-	return $result;
-    }
-*/
-
     // core API
     public static function segments($polygon) {
 	$regionIntersecter = new RegionIntersecter();
@@ -186,23 +163,6 @@ class Algorithm {
 	    $segments2->isInverted
 	);
     }
-
-/*
-
-    public static function selectUnion($combinedPolySegments) {
-	return new PolySegments(
-	    segments: self::__select(
-		$combinedPolySegments->combined, [
-		    0, 2, 1, 0,
-		    2, 2, 0, 0,
-		    1, 0, 1, 0,
-		    0, 0, 0, 0,
-		]
-	    ),
-	    isInverted: ($combinedPolySegments->isInverted1 || $combinedPolySegments->isInverted2)
-	);
-    }
-*/
 
     /**
      * Selección específica para UNIÓN (A ∪ B) sin tabla.
@@ -242,70 +202,6 @@ class Algorithm {
 
         return $result;
     }
-/*
-    public static function selectUnion($combinedPolySegments)
-    {
-        // Sustituimos la versión con tabla por la lógica directa
-        $selected = self::__selectUnionLogical($combinedPolySegments->combined);
-
-        return new PolySegments(
-            segments:   $selected,
-            isInverted: ($combinedPolySegments->isInverted1 || $combinedPolySegments->isInverted2)
-        );
-    }
-    public static function selectIntersect($combinedPolySegments) {
-	return new PolySegments(
-	    segments: self::__select(
-		$combinedPolySegments->combined, [
-		    0, 0, 0, 0,
-		    0, 2, 0, 2,
-		    0, 0, 1, 1,
-		    0, 2, 1, 0
-		]
-	    ),
-	    isInverted: ($combinedPolySegments->isInverted1 && $combinedPolySegments->isInverted2)
-	);
-    }
-    public static function selectDifference($combinedPolySegments) {
-	return new PolySegments(
-	    segments: self::__select(
-		$combinedPolySegments->combined, [
-		    0, 0, 0, 0,
-		    2, 0, 2, 0,
-		    1, 1, 0, 0,
-		    0, 1, 2, 0
-		]
-	    ),
-	    isInverted: ($combinedPolySegments->isInverted1 && !$combinedPolySegments->isInverted2)
-	);
-    }
-    public static function selectDifferenceRev($combinedPolySegments) {
-	return new PolySegments(
-	    segments: self::__select(
-		$combinedPolySegments->combined, [
-		    0, 2, 1, 0,
-		    0, 0, 1, 1,
-		    0, 2, 0, 2,
-		    0, 0, 0, 0
-		]
-	    ),
-	    isInverted: (!$combinedPolySegments->isInverted1 && $combinedPolySegments->isInverted2)
-	);
-    }
-    public static function selectXor($combinedPolySegments) {
-	return new PolySegments(
-	    segments: self::__select(
-		$combinedPolySegments->combined, [
-		    0, 2, 1, 0,
-		    2, 0, 0, 1,
-		    1, 0, 0, 2,
-		    0, 1, 2, 0
-		]
-	    ),
-	    isInverted: ($combinedPolySegments->isInverted1 != $combinedPolySegments->isInverted2)
-	);
-    }
-*/
 
     public static function polygon($segments) {
 	$s = self::segmentChainer($segments->segments);
@@ -357,14 +253,6 @@ class Algorithm {
     public static function xoring($polygon1, $polygon2) {
 	return self::__operate($polygon1, $polygon2, 'selectXor');
     }
-
-
-
-
-
-
-
-
 
     /**
      * Helper genérico: selecciona segmentos por operación booleana a nivel de lado.
