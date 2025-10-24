@@ -31,7 +31,6 @@ class Algorithm {
     public static function segmentChainer(array $segments): array {
 	$regions = [];
 	$chains = [];
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 
 	foreach ($segments as $k => $segment) {
 	    $point1 = $segment->start;
@@ -351,45 +350,6 @@ class Algorithm {
             segments:   $segments,
             isInverted: ($combinedPolySegments->isInverted1 != $combinedPolySegments->isInverted2)
         );
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    public static function arrays_are_equal(array $a1, array $a2): bool {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-	if (count($a1) !== count($a2)) {
-	    return false; // Si tienen diferentes tamaños, no son iguales
-	}
-	foreach ($a1 as $key => $value) {
-	    if (!array_key_exists($key, $a2)) {
-		return false; // Si una clave falta en $a2, no son iguales
-	    }
-	    if (is_array($value) && is_array($a2[$key])) {
-		if (!self::arrays_are_equal($value, $a2[$key])) {
-		    return false; // Llamada recursiva para comparar subarrays
-		}
-	    } elseif ($value != $a2[$key]) {
-		return false; // Si los valores son distintos, no son iguales
-	    }
-	}
-	return true; // Si todo coincide, los arrays son iguales
     }
 
 }
