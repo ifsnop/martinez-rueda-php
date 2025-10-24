@@ -46,15 +46,15 @@ class Polygon {
     }
 
     public function __construct(){
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
+	//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
     }
 
     public static function create() {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
+	//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	return new self();
     }
     public function fillFromArray(array $regions, bool $isInverted = false) {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
+	//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         $_regions = [];
         foreach ($regions as $region) {
             $tmp = [];
@@ -73,7 +73,7 @@ class Polygon {
 	return $this;
     }
     public function fillFromPolySegments(PolySegments $regions, bool $isInverted = false) {
-	if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
+	//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         $_regions = [];
         foreach ($regions as $region) {
             $tmp = [];

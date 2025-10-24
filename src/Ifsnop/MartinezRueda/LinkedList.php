@@ -57,9 +57,7 @@ class LinkedList {
      * @param callable $check Función que recibe un Node y retorna bool
      */
     public function insertBefore(Node $node, callable $check): void {
-        if (Algorithm::DEBUG) {
-            print __METHOD__ . PHP_EOL;
-        }
+        // if (Algorithm::DEBUG) print __METHOD__ . PHP_EOL;
 
 	// Desenlaza si ya estaba en una lista (si tienes owner) o si tiene enlaces activos
 	if ($node->previous !== null || $node->next !== null) {
@@ -96,9 +94,7 @@ class LinkedList {
      * @return Transition
      */
     public function findTransition(callable $check): Transition {
-        if (Algorithm::DEBUG) {
-            print __METHOD__ . PHP_EOL;
-        }
+        // if (Algorithm::DEBUG) print __METHOD__ . PHP_EOL;
 
         $previous = $this->root;
         $current = $this->root->next;
@@ -138,9 +134,7 @@ class LinkedList {
      * @return Node El mismo nodo preparado
      */
     public static function node(Node $node): Node {
-        if (Algorithm::DEBUG) {
-            print __METHOD__ . PHP_EOL;
-        }
+        //if (Algorithm::DEBUG) print __METHOD__ . PHP_EOL;
 
         $node->previous = null;
         $node->next = null;

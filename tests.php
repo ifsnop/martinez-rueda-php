@@ -102,8 +102,6 @@ $test = [
 
 $fail = false;
 foreach( $test as $test_number => $test_predicates ) {
-    if ( $test_number != 9 )
-	continue;
     $pa = MR\Polygon::create()->fillFromArray($test_predicates['region_a']);
     $pb = MR\Polygon::create()->fillFromArray($test_predicates['region_b']);
 
