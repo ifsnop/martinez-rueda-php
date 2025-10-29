@@ -100,6 +100,55 @@ $test = [
     ],
 ];
 
+/*
+
+$p =
+[
+    [
+        [[-76.509, 38.751], [-76.343, 38.714], [-76.37267128027678, 38.74011072664357], [-76.339, 38.721], [-76.377, 38.782], [-76.509, 38.751] ],
+        [[-76.377, 38.782], [-76.37602658486708, 38.743063394683034], [-76.393, 38.758], [-76.385, 38.765], [-76.377, 38.782]]
+    ],
+
+    [
+        [[-76.388, 38.755], [-76.377, 38.749], [-76.383, 38.756], [-76.388, 38.755]]
+    ]
+];
+
+print json_encode($p) . PHP_EOL;
+$p = MR\GJTools::toGeoJSONFromRingsOrGeometry($p, preferPolygon: false, allowNestedHoles: true);
+print json_encode($p) . PHP_EOL . PHP_EOL;
+
+
+exit(0);
+
+*/
+
+$t = [[[-1,0],[0,-1],[0,0]],[[1,0],[0,0],[0,1]]];
+$t_normalized = MR\GJTools::geojsonToPolygons($t);
+print json_encode($t) . PHP_EOL;
+print json_encode($t_normalized) . PHP_EOL; 
+exit(1);
+
+/*
+$argsPath = "tests/end-to-end/issue-38/args.geojson";
+$expectedPath = "tests/end-to-end/issue-38/union.geojson";
+
+$argsPolygon = MR\GJTools::geojsonToPolygons($argsPath);
+$expectedPolygon = MR\GJTools::geojsonToPolygons($expectedPath);
+
+print json_encode($argsPolygon) . PHP_EOL;
+print json_encode($expectedPolygon) . PHP_EOL;
+
+exit(0);
+*/
+
+// MR
+// el algoritmo espera poligonos como entrada (que están formados por un anillo de
+// contorno exterior y n anillos representando agujeros.
+
+// el algoritmo devuelve o bien polígonos o bien listas de polígonos, dependiendo
+// del resultado de la operación.
+
 $fail = false;
 foreach( $test as $test_number => $test_predicates ) {
     $pa = MR\Polygon::create()->fillFromArray($test_predicates['region_a']);
@@ -108,13 +157,17 @@ foreach( $test as $test_number => $test_predicates ) {
     foreach ( $test_predicates['res'] as $op => $expected ) {
 	$diff = array();
 	$result = MR\Algorithm::$op($pa, $pb)->getArray();
-	$result_normalized = MR\GJTools::ringsToCoordinates($result);
-	// print "EXPECTED" . PHP_EOL . json_encode($expected) . PHP_EOL;
-	// print "RESULT" . PHP_EOL . json_encode($result) . PHP_EOL;
 
-	$expected_normalized = MR\GJTools::ringsToCoordinates($expected);
-	// print "EXPECTE NORMALIZED" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
-	// print "RESULT NORMALIZED" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
+	// print "PA" . PHP_EOL . json_encode($test_predicates['region_a']) . PHP_EOL;
+	// print "PB" . PHP_EOL . json_encode($test_predicates['region_b']) . PHP_EOL;
+	// print "RS" . PHP_EOL . json_encode($result) . PHP_EOL . PHP_EOL;
+	// continue;
+
+	// soporta como entrada Polygon o MultiPolygon
+	$result_normalized = MR\GJTools::geojsonToPolygons($result);
+	//print "RESULT NORMALIZED" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
+	$expected_normalized = MR\GJTools::geojsonToPolygons($expected);
+	// print "EXPECTED NORMALIZED" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
 
 	$ret = MR\GJTools::compareCoordinates($result_normalized, $expected_normalized, $diff);
 
@@ -122,13 +175,17 @@ foreach( $test as $test_number => $test_predicates ) {
 	    print "Result PASS {$test_number} {$op}" . PHP_EOL;
 	} else {
 	    print "Result FAIL {$test_number} {$op}" . PHP_EOL;
-	    print "OPA" . PHP_EOL . json_encode(MR\GJTools::ringsToCoordinates($test_predicates['region_a'])[0]) . PHP_EOL;
-	    print "OPB" . PHP_EOL . json_encode(MR\GJTools::ringsToCoordinates($test_predicates['region_b'])[0]) . PHP_EOL;
+	    print "OPA" . PHP_EOL . json_encode(MR\GJTools::geojsonToPolygons($test_predicates['region_a'])) . PHP_EOL; // MR\GJTools::ringsToCoordinates($test_predicates['region_a'])[0]) . PHP_EOL;
+	    print "OPB" . PHP_EOL . json_encode(MR\GJTools::geojsonToPolygons($test_predicates['region_b'])) . PHP_EOL; // MR\GJTools::ringsToCoordinates($test_predicates['region_a'])[0]) . PHP_EOL;
+	    // print "OPB" . PHP_EOL . json_encode(MR\GJTools::ringsToCoordinates($test_predicates['region_b'])[0]) . PHP_EOL;
 	    // print json_encode($expected[0]) . PHP_EOL;
-	    print "EXPECTED" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
-	    print "GOT" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
+	    print "EXPECTED" . PHP_EOL . json_encode($expected) . PHP_EOL;
+	    print "GOT" . PHP_EOL . json_encode($result) . PHP_EOL;
+	    print "EXPECTED NORMALIZED" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
+	    print "GOT NORMALIZED" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
 	    // print "GoN: " . json_encode($result) . PHP_EOL;
 	    $fail = true;
+	    exit(1);
 	}
     }
 }
@@ -137,6 +194,23 @@ if ( $fail )
     exit(1);
 
 exit(0);
+
+
+// UNION DE DOS POLIGONOS INDEPENDIENTES
+$region_a = MR\GJTools::ringsToCoordinates([[[0,0], [2,0], [1,1]]]);
+$region_b = MR\GJTools::ringsToCoordinates([[[0,0], [3,0], [3,-1]]]);
+$pa = MR\Polygon::create()->fillFromArray($region_a[0]);
+$pb = MR\Polygon::create()->fillFromArray($region_b[0]);
+$result = MR\Algorithm::union($pa, $pb)->getArray();
+print "INDEPENDIENTES" . PHP_EOL; // . json_encode($result) . PHP_EOL;
+print json_encode($region_a[0]) . PHP_EOL;
+print json_encode($region_b[0]) . PHP_EOL;
+print json_encode(MR\GJTools::ringsToCoordinates($result)) . PHP_EOL;;
+
+exit(0);
+
+
+
 
 // UNION DE DOS POLIGONOS UNIDOS POR UN VERTICE, DEBE GENERAR DOS POLIGONOS
 $region_a = MR\GJTools::ringsToCoordinates( [[[0,0], [1,0], [0,1],[0,0]]] );

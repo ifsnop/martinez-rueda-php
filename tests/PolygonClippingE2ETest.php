@@ -210,6 +210,8 @@ final class PolygonClippingE2ETest extends TestCase
 
         foreach ($dirs as $d) {
 
+	    if ( false === strpos($d, "issue-38") )
+		continue;
 	//    if ( false === strpos($d, "issue-60-8") )
 	//	continue;
 
@@ -264,13 +266,20 @@ final class PolygonClippingE2ETest extends TestCase
      */
     public function testEndToEnd(string $label, string $op, string $argsPath, string $expectedPath): void {
 
-//	print "label: $label" . PHP_EOL;
-//	print "op: $op" . PHP_EOL;
-//	print "argsPath: $argsPath" . PHP_EOL;
-//	print "expectedPath: $expectedPath" . PHP_EOL;
+	print "label: $label" . PHP_EOL;
+	print "op: $op" . PHP_EOL;
+	print "argsPath: $argsPath" . PHP_EOL;
+	print "expectedPath: $expectedPath" . PHP_EOL;
+
+	$argsPolygon = MR\GJTools::geojsonToPolygons($argsPath);
+
+	print json_encode($argsPolygon) . PHP_EOL; exit(1);
+
         $argsGJ = self::readGeoJSON($argsPath);
         $geoms  = self::geomsFromGeoJSON($argsGJ);
-//	print "count geoms: " . count($geoms) . PHP_EOL;
+	print_r($geoms);
+	print "geoms: " . json_encode($geoms) . PHP_EOL;
+	print "count geoms: " . count($geoms) . PHP_EOL;
         if (count($geoms) < 2) {
             $this->markTestSkipped("[$label] args sin geometrías: $argsPath");
         }
@@ -283,18 +292,28 @@ final class PolygonClippingE2ETest extends TestCase
 
 
 	$got = self::runOpMulti($geoms, $op);
-	$got_normalized = MR\GJTools::ringsToCoordinates($got);
+	// $got_normalized = MR\GJTools::ringsToCoordinates($got);
+
+	print "got  : " . json_encode($got) . PHP_EOL;
+
+
+	$got_normalized = MR\GJTools::toGeoJSONFromRingsOrGeometry($got);
+
 
         $expectedGJ = self::readGeoJSON($expectedPath);
         $expGeoms   = self::geomsFromGeoJSON($expectedGJ);
-        $exp        = isset($expGeoms[0]) ? $expGeoms[0] : []; // MultiPolygon vacío si corresponde
-	$exp_normalized = MR\GJTools::fixGeometries($exp);
-	$exp_normalized = MR\GJTools::canonicalizePolygons($exp_normalized, (int)abs(floor(log10(abs(MR\Algorithm::TOLERANCE)))));
+	print "exp  : " . json_encode($expGeoms) . PHP_EOL . PHP_EOL;exit(1);
+        //$exp        = isset($expGeoms[0]) ? $expGeoms[0] : []; // MultiPolygon vacío si corresponde
+	//$exp_normalized = MR\GJTools::fixGeometries($exp);
+	//$exp_normalized = MR\GJTools::canonicalizePolygons($exp_normalized, (int)abs(floor(log10(abs(MR\Algorithm::TOLERANCE)))));
+	$exp_normalized = MR\GJTools::toGeoJSONFromRingsOrGeometry($expGeoms);
 
-	//print "got  : " . json_encode($got) . PHP_EOL;
-	//print "exp  : " . json_encode($exp) . PHP_EOL . PHP_EOL;
-//	print "exp_n: " . json_encode($exp_normalized) . PHP_EOL;
-//	print "got_n: " . json_encode($got_normalized) . PHP_EOL;
+
+	// print "got  : " . json_encode($got) . PHP_EOL;
+	// print "exp  : " . json_encode($exp) . PHP_EOL . PHP_EOL;
+	print "exp_n: " . json_encode($exp_normalized) . PHP_EOL;
+	print "got_n: " . json_encode($got_normalized) . PHP_EOL;
+	exit(1);
 	//print "got  : " . json_encode($got) . PHP_EOL;
 	$diff = [];
 	//$ret = self::compareCoordinates($got_normalized, $exp_normalized, $diff);

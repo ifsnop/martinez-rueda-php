@@ -45,7 +45,7 @@ class Polygon {
 	return $arr_regions;
     }
 
-    public function __construct(){
+    public function __construct() {
 	//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
     }
 
