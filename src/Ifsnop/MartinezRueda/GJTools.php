@@ -757,6 +757,8 @@ public static function ringsToGeoJSON(
     */
     public static function geojsonToPolygons($geojsonSource, bool $enforceOrientation = false): array
     {
+
+	// print "ORIGINAL> " . json_encode($geojsonSource) . PHP_EOL;
 	// 1) Cargar/decodificar
 	if (is_string($geojsonSource)) {
 	    if (is_file($geojsonSource)) {
@@ -785,6 +787,55 @@ public static function ringsToGeoJSON(
 
 	// 2) Recorrer recursivamente y extraer polígonos
 	$polygons = self::extractPolygonsRec($root, $enforceOrientation);
+	// print "POLYGONS> " . json_encode($polygons) . PHP_EOL;
+
+	// 3) Flatten
+	// necesitamos aplanar los rings para tenerlos todos seguidos
+	$polygons = self::flattenMultipolygon($polygons);
+
+	// La salida de extract es siempre multipolygon!!
+	// Comprobar si el resultado es Multipolygon o Polygon
+/*	$type = self::detectGeometryTypeFromCoordinatesArray($polygons);
+	print "TYPE> " . $type . PHP_EOL;
+
+	$rings = [];
+        if ($type === 'Polygon') {
+            // $coordinates = [ [ring0], [ring1], ... ]
+            foreach ($polygons as $ring) {
+                $rings[] = $ring;
+            }
+        } elseif ($type === 'MultiPolygon') {
+            // $coordinates = [ [ [ring0], [ring1], ... ], [ [ring0], ... ], ... ]
+            foreach ($polygons as $polygon) {
+                foreach ($polygon as $ring) {
+                    $rings[] = $ring;
+                }
+            }
+        } else {
+            throw new InvalidArgumentException("Tipo no soportado: $type. Usa 'Polygon' o 'MultiPolygon'.");
+        }
+*/
+	// print "flatted>  " . json_encode($polygons) . PHP_EOL; ;
+
+	// averiguar cuales son interior y cuales son exterior, teniendo en cuenta que
+	// los pares son exterior y los impares interior
+
+	$nodes = self::classifyRings($polygons);
+
+	// print "CLASSIF>  " . json_encode($nodes) . PHP_EOL;
+
+
+	$polygons = self::buildPolygons($nodes, $enforceOrientation=true);
+
+	// print "LAST>     " . json_encode($polygons) . PHP_EOL; ;
+
+	// canonicalizePolygons 
+        $tol = max(Algorithm::TOLERANCE, PHP_FLOAT_EPSILON);
+        $digits = (int) max(0, round(-log10($tol)));
+        $polygons = self::canonicalizePolygons($polygons, $digits);
+
+	// print "CANONICAL>     " . json_encode($polygons) . PHP_EOL; ;
+
 	// Asegurar que siempre devolvemos un array (posiblemente vacío)
 	return array_values($polygons);
     }
@@ -868,11 +919,6 @@ public static function ringsToGeoJSON(
 		break;
 	}
 
-	// canonicalizePolygons 
-        $tol = max(Algorithm::TOLERANCE, PHP_FLOAT_EPSILON);
-        $digits = (int) max(0, round(-log10($tol)));
-        $out = self::canonicalizePolygons($out, $digits);
-
 	return $out;
     }
 
@@ -889,7 +935,7 @@ public static function ringsToGeoJSON(
      * @param bool $enforceOrientation
      * @return array
      */
-    private static function normalizePolygon(array $coords, bool $enforceOrientation): array
+    private static function normalizePolygon(array $coords/*, bool $enforceOrientation*/): array
     {
 	$rings = [];
 
@@ -926,11 +972,11 @@ public static function ringsToGeoJSON(
 	    }
 	    */
 
-
 	    // Un anillo válido necesita al menos 4 puntos en GeoJSON (incl. cierre).
 	    // Como removimos el cierre duplicado, exigimos >= 3 puntos distintos (triángulo).
-	    if (count($ring) < 4) {
+	    if (count($ring) < 3) {
 		// anillo degenerado → ignorar
+		throw new \InvalidArgumentException("Anillo degenerado count(ring)<3.");
 		continue;
 	    }
 
@@ -945,7 +991,7 @@ public static function ringsToGeoJSON(
 	if (empty($rings)) {
 	    return [];
 	}
-
+/*
 	if ($enforceOrientation) {
 	    // Exterior: CCW; Huecos: CW
 	    foreach ($rings as $i => $r) {
@@ -965,7 +1011,7 @@ public static function ringsToGeoJSON(
 		}
 	    }
 	}
-
+*/
 	return $rings;
     }
 
@@ -976,6 +1022,7 @@ public static function ringsToGeoJSON(
      * @param array $ring Array de [x,y]
      * @return float
      */
+/*
     private static function ringSignedArea(array $ring): float
     {
 	$n = count($ring);
@@ -988,6 +1035,24 @@ public static function ringsToGeoJSON(
 	}
 	return $sum / 2.0;
     }
+*/
+
+    /**
+     * Flattens a Multipolygon array so we can classify rings (exterior, interior, parent, child)
+     * @param array polygons
+     * @return array
+     */
+     private static function flattenMultipolygon(array $polygons): array
+     {
+	$rings = [];
+
+	foreach ($polygons as $polygon) {
+	    foreach ($polygon as $ring) {
+		$rings[] = $ring;
+            }
+	}
+	return $rings;
+     }
 
     /**
      * Asegura que el anillo esté cerrado (primer punto == último).
@@ -1277,7 +1342,6 @@ public static function ringsToGeoJSON(
 	return false;
     }
 
-
     /** Devuelve true si $arr tiene pinta de posición [x,y(,z...)] */
     private static function looksLikePosition($arr): bool
     {
@@ -1300,11 +1364,11 @@ public static function ringsToGeoJSON(
 	} else {
 	    $type = self::detectGeometryTypeFromCoordinatesString($coordinatesJson);
 	}
-        $coords = json_decode(trim($coordinatesJson), true);
-        return [
-            'type' => $type,
-            'coordinates' => $coords,
-        ];
+	$coords = json_decode(trim($coordinatesJson), true);
+	return [
+	    'type' => $type,
+	    'coordinates' => $coords,
+	];
     }
 
 
@@ -1329,7 +1393,6 @@ public static function ringsToGeoJSON(
         $nb = count($coordsB);
         if ($na !== $nb) {
             $diff = ['where' => 'polygon_count', 'a' => $na, 'b' => $nb];
-	    //print "ABORT1" . PHP_EOL;
             return false;
         }
 
@@ -1342,7 +1405,6 @@ public static function ringsToGeoJSON(
             $rb = count($polyB);
             if ($ra !== $rb) {
                 $diff = ['where' => 'ring_count', 'polygon' => $p, 'a' => $ra, 'b' => $rb];
-		// print "ABORT2" . PHP_EOL;
                 return false;
             }
 
@@ -1354,7 +1416,6 @@ public static function ringsToGeoJSON(
                 $pb = count($ringB);
                 if ($pa !== $pb) {
                     $diff = ['where' => 'point_count', 'polygon' => $p, 'ring' => $r, 'a' => $pa, 'b' => $pb];
-		    // print "ABORT3" . PHP_EOL;
                     return false;
                 }
 
@@ -1369,7 +1430,6 @@ public static function ringsToGeoJSON(
                             'polygon' => $p, 'ring' => $r, 'point' => $k,
                             'a' => $ax, 'b' => $bx
                         ];
-			// print "ABORT4" . PHP_EOL;
                         return false;
                     }
                     if (!self::almostEq($ay, $by)) {
@@ -1378,7 +1438,6 @@ public static function ringsToGeoJSON(
                             'polygon' => $p, 'ring' => $r, 'point' => $k,
                             'a' => $ay, 'b' => $by
                         ];
-			// print "ABORT5" . PHP_EOL;
                         return false;
                     }
                 }
@@ -1387,6 +1446,309 @@ public static function ringsToGeoJSON(
 
         return true;
     }
+
+
+
+
+    /**
+     * A partir de una lista de rings, calcula:
+     * - parent: índice del ring que lo contiene más cercano (o null)
+     * - depth: nivel de anidamiento (0,1,2,...)
+     * - parity: 'exterior' (niveles pares) | 'interior' (niveles impares)
+     * Devuelve además bbox y área para diagnóstico.
+     *
+     * @param array $rings Lista de rings (cada ring = [[x,y], ...] cerrado)
+     * @return array Lista con metadatos: [
+     *   [
+     *     'ring' => [[x,y]...],
+     *     'bbox' => [minx, miny, maxx, maxy],
+     *     'area' => float (signed),
+     *     'parent' => int|null,
+     *     'depth' => int,
+     *     'parity' => 'exterior'|'interior',
+     *     'children' => [indices...]
+     *   ],
+     *   ...
+     * ]
+     */
+    public static function classifyRings(array $rings): array
+    {
+        $n = count($rings);
+        $nodes = [];
+
+        // Precalcular bbox, área y punto de prueba (centroide)
+        for ($i = 0; $i < $n; $i++) {
+            $ring = $rings[$i];
+            $bbox = self::bbox($ring);
+            $area = self::signedArea($ring);
+            $pt   = self::interiorPoint($ring); // punto para pruebas pinp
+
+            $nodes[] = [
+                'ring' => $ring,
+                'bbox' => $bbox,
+                'area' => $area,
+                'testPoint' => $pt,
+                'parent' => null,
+                'depth' => 0,
+                'parity' => 'exterior', // provisional
+                'children' => []
+            ];
+        }
+
+        // Buscar contenedor más pequeño para cada ring (O(n^2))
+        for ($i = 0; $i < $n; $i++) {
+            $bestParent = null;
+            $bestAbsArea = INF;
+
+            for ($j = 0; $j < $n; $j++) {
+                if ($i === $j) continue;
+
+                if (!self::bboxContains($nodes[$j]['bbox'], $nodes[$i]['bbox'])) {
+                    continue;
+                }
+
+                // Un test point del hijo dentro del anillo j
+                if (self::pointInRing($nodes[$i]['testPoint'], $nodes[$j]['ring'])) {
+                    $absA = abs($nodes[$j]['area']);
+                    if ($absA < $bestAbsArea) {
+                        $bestAbsArea = $absA;
+                        $bestParent = $j;
+                    }
+                }
+            }
+
+            $nodes[$i]['parent'] = $bestParent;
+        }
+
+        // Construir hijos y calcular depth
+        for ($i = 0; $i < $n; $i++) {
+            $p = $nodes[$i]['parent'];
+            if ($p !== null) {
+                $nodes[$p]['children'][] = $i;
+            }
+        }
+
+        // Profundidad por BFS/DFS desde raíces (parent === null)
+        $queue = [];
+        for ($i = 0; $i < $n; $i++) {
+            if ($nodes[$i]['parent'] === null) {
+                $nodes[$i]['depth'] = 0;
+                $queue[] = $i;
+            }
+        }
+        while (!empty($queue)) {
+            $cur = array_shift($queue);
+            foreach ($nodes[$cur]['children'] as $ch) {
+                $nodes[$ch]['depth'] = $nodes[$cur]['depth'] + 1;
+                $queue[] = $ch;
+            }
+        }
+
+        // Paridad
+        for ($i = 0; $i < $n; $i++) {
+            $nodes[$i]['parity'] = ($nodes[$i]['depth'] % 2 === 0) ? 'exterior' : 'interior';
+        }
+
+        // Limpieza: no devolvemos testPoint
+        for ($i = 0; $i < $n; $i++) {
+            unset($nodes[$i]['testPoint']);
+        }
+
+        return $nodes;
+    }
+
+    /** ==========================================
+     *  3) CONSTRUCCIÓN DE MULTIPOLYGON(S) GeoJSON
+     *  ==========================================
+     */
+
+
+    /**
+     * Devuelve una LISTA DE POLÍGONOS.
+     * Cada polígono: [ ringExterior, hole1, hole2, ... ].
+     * Útil si luego quieres:
+     *   - Polygon: elegir uno
+     *   - MultiPolygon (único): envolver esta lista una vez
+     */
+    public static function buildPolygons(array $nodes, bool $enforceOrientation = false): array
+    {
+        // familias (raíces)
+        $roots = [];
+        foreach ($nodes as $i => $node) {
+            if ($node['parent'] === null) $roots[] = $i;
+        }
+
+        $polygons = [];
+
+        foreach ($roots as $root) {
+            $family = self::collectSubtree($nodes, $root);
+            foreach ($family as $idx) {
+                if ($nodes[$idx]['parity'] === 'exterior') {
+                    $exterior = $nodes[$idx]['ring'];
+                    $holes = [];
+                    foreach ($nodes[$idx]['children'] as $ch) {
+                        if ($nodes[$ch]['parity'] === 'interior') {
+                            $holes[] = $nodes[$ch]['ring'];
+                        }
+                    }
+
+                    if ($enforceOrientation) {
+                        $exterior = self::orientExteriorCCW($exterior);
+                        $holes    = array_map([self::class, 'orientHoleCW'], $holes);
+                    }
+
+                    $polygons[] = array_merge([$exterior], $holes);
+                }
+            }
+        }
+
+        return $polygons; // <- SIN nivel extra de MultiPolygon[]
+    }
+
+    /**
+     * Recolecta el subárbol (índices) desde un nodo raíz.
+     */
+    private static function collectSubtree(array $nodes, int $root): array
+    {
+        $out = [];
+        $stack = [$root];
+        while (!empty($stack)) {
+            $cur = array_pop($stack);
+            $out[] = $cur;
+            foreach ($nodes[$cur]['children'] as $ch) {
+                $stack[] = $ch;
+            }
+        }
+        return $out;
+    }
+
+    /** ======================
+     *  Geometría: utilidades
+     *  ======================
+     */
+
+    /**
+     * BBox [minx, miny, maxx, maxy]
+     */
+    private static function bbox(array $ring): array
+    {
+        $minx = $miny = INF;
+        $maxx = $maxy = -INF;
+        foreach ($ring as $pt) {
+            $x = $pt[0]; $y = $pt[1];
+            if ($x < $minx) $minx = $x;
+            if ($y < $miny) $miny = $y;
+            if ($x > $maxx) $maxx = $x;
+            if ($y > $maxy) $maxy = $y;
+        }
+        return [$minx, $miny, $maxx, $maxy];
+    }
+
+    private static function bboxContains(array $A, array $B): bool
+    {
+        return $A[0] <= $B[0] && $A[1] <= $B[1] && $A[2] >= $B[2] && $A[3] >= $B[3];
+    }
+
+    /**
+     * Área con signo por fórmula del polígono (shoelace). Cero si ring degenerado.
+     */
+    private static function signedArea(array $ring): float
+    {
+        $n = count($ring);
+        if ($n < 4) return 0.0; // mínimo 3 puntos + cierre
+        $sum = 0.0;
+        for ($i = 0; $i < $n - 1; $i++) {
+            $x1 = $ring[$i][0];   $y1 = $ring[$i][1];
+            $x2 = $ring[$i+1][0]; $y2 = $ring[$i+1][1];
+            $sum += ($x1 * $y2 - $x2 * $y1);
+        }
+        return 0.5 * $sum; // CCW positivo
+    }
+
+    /**
+     * Un punto “dentro” del ring: centroide si área!=0; si no, el primer vértice.
+     */
+    private static function interiorPoint(array $ring): array
+    {
+        $A = self::signedArea($ring);
+        if ($A == 0.0) {
+            return $ring[0];
+        }
+        $cx = 0.0; $cy = 0.0;
+        $n = count($ring);
+        $factor = 0.0;
+        for ($i = 0; $i < $n - 1; $i++) {
+            $x1 = $ring[$i][0];   $y1 = $ring[$i][1];
+            $x2 = $ring[$i+1][0]; $y2 = $ring[$i+1][1];
+            $cross = ($x1 * $y2 - $x2 * $y1);
+            $cx += ($x1 + $x2) * $cross;
+            $cy += ($y1 + $y2) * $cross;
+            $factor += $cross;
+        }
+        if ($factor == 0.0) return $ring[0];
+        $cx = $cx / (3.0 * $factor);
+        $cy = $cy / (3.0 * $factor);
+        return [$cx, $cy];
+    }
+
+    /**
+     * Test punto-en-ring (ray casting). Considera puntos en borde como DENTRO.
+     */
+    private static function pointInRing(array $pt, array $ring): bool
+    {
+        $x = $pt[0]; $y = $pt[1];
+        $inside = false;
+        $n = count($ring);
+        for ($i = 0, $j = $n - 1; $i < $n; $j = $i++) {
+            $xi = $ring[$i][0]; $yi = $ring[$i][1];
+            $xj = $ring[$j][0]; $yj = $ring[$j][1];
+
+            // Chequeo rápido de punto sobre segmento (opcional)
+            if (self::pointOnSegment($pt, [$xj, $yj], [$xi, $yi])) {
+                return true;
+            }
+
+            $intersect = (($yi > $y) != ($yj > $y)) &&
+                         ($x < ($xj - $xi) * ($y - $yi) / (($yj - $yi) ?: 1e-30) + $xi);
+            if ($intersect) $inside = !$inside;
+        }
+        return $inside;
+    }
+
+    private static function pointOnSegment(array $p, array $a, array $b, float $eps = 1e-12): bool
+    {
+        $cross = ($b[0]-$a[0])*($p[1]-$a[1]) - ($b[1]-$a[1])*($p[0]-$a[0]);
+        if (abs($cross) > $eps) return false;
+        $dot = ($p[0]-$a[0])*($b[0]-$a[0]) + ($p[1]-$a[1])*($b[1]-$a[1]);
+        if ($dot < -$eps) return false;
+        $sqLen = ($b[0]-$a[0])**2 + ($b[1]-$a[1])**2;
+        if ($dot - $sqLen > $eps) return false;
+        return true;
+    }
+
+    /** ===========================
+     *  Orientación opcional (RFC)
+     *  ===========================
+     *  GeoJSON recomienda (no exige) exteriores CCW y huecos CW.
+     */
+    private static function orientExteriorCCW(array $ring): array
+    {
+        return (self::signedArea($ring) >= 0) ? $ring : array_reverse($ring);
+    }
+
+    private static function orientHoleCW(array $ring): array
+    {
+        return (self::signedArea($ring) <= 0) ? $ring : array_reverse($ring);
+    }
+
+
+
+
+
+
+
+
+
 
 
 
