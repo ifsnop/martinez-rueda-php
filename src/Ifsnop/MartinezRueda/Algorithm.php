@@ -576,6 +576,10 @@ public static function segmentChainer(array $segments): array {
 	return self::__operate($polygon1, $polygon2, 'selectIntersect');
     }
 
+    public static function intersection($polygon1, $polygon2) {
+	return self::__operate($polygon1, $polygon2, 'selectIntersect');
+    }
+
     public static function difference($polygon1, $polygon2) {
 	return self::__operate($polygon1, $polygon2, 'selectDifference');
     }

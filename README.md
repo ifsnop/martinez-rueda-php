@@ -3,14 +3,13 @@
 # Martinez Rueda PHP
 
 Boolean operations on polygons (union, intersection, difference, xor)
-(this library is a port for PHP of [pypolybool](https://github.com/KaivnD/pypolybool))
 
 # Resources
 
 * [View the demo + animation](https://rawgit.com/voidqk/polybooljs/master/dist/demo.html)
 * Based somewhat on the F. Martinez (2008) algorithm:
     * [Website](https://www4.ujaen.es/~fmartin/bool_op.html)
-    * [A new algorithm for computing Boolean operations on polygons 2009](https://www.researchgate.net/publication/220163820_A_new_algorithm_for_computing_Boolean_operations_on_polygons)
+    * [A new algorithm for computing Boolean operations on polygons 2009](https://www.researchgate.net/publication/220163820_A_new_algorithm_for_computing_Boolean_operations_on_polygons)[Paper](http://www.cs.ucr.edu/~vbz/cs230papers/martinez_boolean.pdf)
     * [A simple algorithm for Boolean operations on polygons 2013](https://investigacion.ujaen.es/documentos/5f1cdfbd29995265e44d906f?lang=en)
 
 # Example
@@ -27,3 +26,7 @@ See tests.php
 # Improvements
 * [Speed improvement with inserts by bisection](https://github.com/velipso/polybooljs/issues/23) [Pull](https://github.com/velipso/polybooljs/pull/28)
 
+# History
+* This library is a port for PHP of [pypolybool](https://github.com/KaivnD/pypolybool)
+* Previoulsy, was a port for JS of [polybooljs](https://github.com/velipso/polybooljs)
+* Help from a .NET [port](https://github.com/idormenco/PolyBool.Net)

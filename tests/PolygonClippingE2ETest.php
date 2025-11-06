@@ -181,26 +181,13 @@ final class PolygonClippingE2ETest extends TestCase
         return $out;
     }
 
-    private static function runOp(array $A_mp, array $B_mp, string $op): array {
-        // Tu port ifsnop/MartinezRueda: Polygon::create()->fillFromArray + funciones globales
-        $pa = MR\Polygon::create()->fillFromArray($A_mp);
-        $pb = MR\Polygon::create()->fillFromArray($B_mp);
-        switch ($op) {
-            case 'union':        return MR\Algorithm::union($pa,$pb)->getArray();
-            case 'intersection': return MR\Algorithm::intersect($pa,$pb)->getArray();
-            case 'difference':   return MR\Algorithm::difference($pa,$pb)->getArray();
-            case 'xor':          return MR\Algorithm::xoring($pa,$pb)->getArray();
-        }
-        throw new InvalidArgumentException("Operación no soportada: $op");
-    }
-
     // ==========================
     // Descubrimiento de casos
     // ==========================
     public static function provideAllCases(): array {
         $root = self::fixturesRoot();
         $ops  = self::opsFilter();
-        $max  = 42; //self::maxCases();
+        $max  = 42; // 42; //self::maxCases();
 
         $datasets = [];
         $dirs = @scandir($root);
@@ -210,8 +197,10 @@ final class PolygonClippingE2ETest extends TestCase
 
         foreach ($dirs as $d) {
 
-	    if ( false === strpos($d, "issue-38") )
+	    if ( false === strpos($d, "multipoly-and-square") )
 		continue;
+	//    if ( false === strpos($d, "issue-38") )
+	// f6	continue;
 	//    if ( false === strpos($d, "issue-60-8") )
 	//	continue;
 
@@ -242,19 +231,44 @@ final class PolygonClippingE2ETest extends TestCase
         return $datasets;
     }
 
+    private static function runOp(array $A_mp, array $B_mp, string $op): array {
+        // Tu port ifsnop/MartinezRueda: Polygon::create()->fillFromArray + funciones globales
+        $pa = MR\Polygon::create()->fillFromArray($A_mp);
+        $pb = MR\Polygon::create()->fillFromArray($B_mp);
+        switch ($op) {
+            case 'union':        return MR\Algorithm::union($pa,$pb)->getArray();
+            case 'intersection': return MR\Algorithm::intersect($pa,$pb)->getArray();
+            case 'difference':   return MR\Algorithm::difference($pa,$pb)->getArray();
+            case 'xor':          return MR\Algorithm::xoring($pa,$pb)->getArray();
+        }
+        throw new InvalidArgumentException("Operación no soportada: $op");
+    }
+
     private static function runOpMulti(array $geomList, string $op): array
     {
 	if (empty($geomList)) return [];
+	print "runOpMulti: " . json_encode($geomList) . PHP_EOL;
 
+	foreach($geomList as $k => $geom) {
+	    print "$k => " . json_encode($geom) . PHP_EOL;
+	    print_r($geom);
+	}
+
+exit(1);
+
+	$geomList = $geomList[0];
 	// Empezamos con la primera geometría como acumulador
 	$acc = $geomList[0];
-	// print json_encode($acc) . PHP_EOL;
+	print "acc: " . json_encode($acc) . PHP_EOL;
 	// Para 'difference' restamos todas las siguientes al sujeto inicial
 	// Para union/intersection/xor reducimos secuencialmente
 	$n = count($geomList);
+	// print "runOpMulti 0: " . json_encode($acc) . PHP_EOL;
 	for ($i = 1; $i < $n; $i++) {
+	    // print "runOpMulti $i: " . json_encode($geomList[$i]) . PHP_EOL;
 	    // print json_encode($geomList[$i]) . PHP_EOL;
 	    $acc = self::runOp($acc, $geomList[$i], $op);
+	    print "$i: " . json_encode($acc) . PHP_EOL;
 	    // (Opcional) micro‑optimizaciones:
 	    // if ($op === 'intersection' && empty($acc)) break;
 	}
@@ -271,62 +285,40 @@ final class PolygonClippingE2ETest extends TestCase
 	print "argsPath: $argsPath" . PHP_EOL;
 	print "expectedPath: $expectedPath" . PHP_EOL;
 
-	$argsPolygon = MR\GJTools::geojsonToPolygons($argsPath);
-
-	print json_encode($argsPolygon) . PHP_EOL; exit(1);
-
         $argsGJ = self::readGeoJSON($argsPath);
         $geoms  = self::geomsFromGeoJSON($argsGJ);
-	print_r($geoms);
-	print "geoms: " . json_encode($geoms) . PHP_EOL;
-	print "count geoms: " . count($geoms) . PHP_EOL;
+
+	$input = ""; foreach($geoms as $k => $g) $input .= "\top$k => " . json_encode($g) . PHP_EOL;
+//	$input_n = ""; foreach($geoms as $k => $g) $input .= "\top$k => " . json_encode(MR\GJTools::geojsonToPolygons($g)) . PHP_EOL;
+//	$geoms_n = []; foreach($geoms as $k => $g) { $geoms_n[] = MR\GJTools::geojsonToPolygons($g); }
+
+	print $input . PHP_EOL;
+//	print $input_n . PHP_EOL;
+
         if (count($geoms) < 2) {
             $this->markTestSkipped("[$label] args sin geometrías: $argsPath");
         }
-	$input = "";
-	foreach($geoms as $k => $g) $input .= "\t$k: " . json_encode($g) . PHP_EOL;
-
-	
 	// Activa el modo debug
 	// MR\Algorithm::DEBUG = true;
 
-
 	$got = self::runOpMulti($geoms, $op);
-	// $got_normalized = MR\GJTools::ringsToCoordinates($got);
+	print json_encode($got) . PHP_EOL;exit(1);
 
-	print "got  : " . json_encode($got) . PHP_EOL;
+	$got_normalized = MR\GJTools::geojsonToPolygons($got);
+	print "got_n  : " . json_encode($got_normalized) . PHP_EOL . PHP_EOL;
 
+	$exp_normalized = MR\GJTools::geojsonToPolygons($expectedPath);
+	print "exp    : " . json_encode($exp_normalized) . PHP_EOL . PHP_EOL;
 
-	$got_normalized = MR\GJTools::toGeoJSONFromRingsOrGeometry($got);
-
-
-        $expectedGJ = self::readGeoJSON($expectedPath);
-        $expGeoms   = self::geomsFromGeoJSON($expectedGJ);
-	print "exp  : " . json_encode($expGeoms) . PHP_EOL . PHP_EOL;exit(1);
-        //$exp        = isset($expGeoms[0]) ? $expGeoms[0] : []; // MultiPolygon vacío si corresponde
-	//$exp_normalized = MR\GJTools::fixGeometries($exp);
-	//$exp_normalized = MR\GJTools::canonicalizePolygons($exp_normalized, (int)abs(floor(log10(abs(MR\Algorithm::TOLERANCE)))));
-	$exp_normalized = MR\GJTools::toGeoJSONFromRingsOrGeometry($expGeoms);
-
-
-	// print "got  : " . json_encode($got) . PHP_EOL;
-	// print "exp  : " . json_encode($exp) . PHP_EOL . PHP_EOL;
-	print "exp_n: " . json_encode($exp_normalized) . PHP_EOL;
-	print "got_n: " . json_encode($got_normalized) . PHP_EOL;
-	exit(1);
-	//print "got  : " . json_encode($got) . PHP_EOL;
 	$diff = [];
-	//$ret = self::compareCoordinates($got_normalized, $exp_normalized, $diff);
-	//var_dump($ret); exit(1);
-	//if ($ret) print "EQUAL" . PHP_EOL; else print "DIFFERENT" . PHP_EOL;
-	//exit(1);
 
         $this->assertTrue(
 	    self::compareCoordinates($got_normalized, $exp_normalized, $diff),
             "Diferencia detectada" . PHP_EOL .
 	    "input" . PHP_EOL . $input .PHP_EOL .
-            "got (recortado)" . PHP_EOL . "\t" . json_encode($got_normalized) . PHP_EOL .
-            "expected (recortado)" . PHP_EOL . "\t" . json_encode($exp_normalized) . PHP_EOL .
+	    "input_n" . PHP_EOL . $input_n . PHP_EOL .
+            "got" . PHP_EOL . "\t" . json_encode($got_normalized) . PHP_EOL .
+            "expected" . PHP_EOL . "\t" . json_encode($exp_normalized) . PHP_EOL .
 	    "diff" . PHP_EOL . "\t" . json_encode($diff) . PHP_EOL
         );
     }

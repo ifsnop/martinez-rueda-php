@@ -95,6 +95,13 @@ $test = [
 	    ],
 	],
     ],
+    10 => [ // UNION DE UN MULTIPOLIGON Y UN POLIGON DA COMO RESULTADO UN POLIGON
+	'region_a' => [ [[ [0,0], [0,1], [1,1], [0,0] ]], [[ [2,2], [2,3], [3,3], [2,2] ]] ],
+	'region_b' => [[ [0,0], [3,0], [3,3], [0,3], [0,0] ]],
+	'res' => [
+	    'union' => [[ [0,0], [3,0], [3,3], [0,3], [0,0] ]],
+	],
+    ],
 ];
 
 /*
@@ -131,6 +138,35 @@ print json_encode($t_normalized) . PHP_EOL;
 exit(1);
 */
 
+$diff = [];
+
+$op1 =  [[[[5,5], [5,6], [6,6] ]]];
+$op2 =  [[[[0,0], [1,0], [1,1] ]]]; //[[ [0,0], [0,1], [1,1], [0,0] ]]; //, [[ [2,2], [2,3], [3,3], [2,2] ]] ];
+$op1_mr = MR\Polygon::create()->fillFromArray($op1);
+$op2_mr = MR\Polygon::create()->fillFromArray($op2);
+$result_op = MR\Algorithm::union($op1_mr, $op2_mr)->getArray();
+
+print "op1: " . json_encode($op1) . PHP_EOL;
+print "op2: " . json_encode($op2) . PHP_EOL;
+print "rop : " . json_encode($result_op) . PHP_EOL;
+
+exit(1);
+
+
+
+$t1 = MR\GJTools::geojsonToPolygons($op1);
+$t2 = MR\GJTools::geojsonToPolygons($op2);
+
+print "t1 : " . json_encode($t1) . PHP_EOL;
+print "t2 : " . json_encode($t2) . PHP_EOL;
+
+$result_t = MR\Algorithm::union($t1, $t2)->getArray();
+
+print "rres: " . json_encode($result_t) . PHP_EOL;
+
+exit(1);
+
+
 /*
 $argsPath = "tests/end-to-end/issue-38/args.geojson";
 $expectedPath = "tests/end-to-end/issue-38/union.geojson";
@@ -160,9 +196,10 @@ foreach( $test as $test_number => $test_predicates ) {
 	$diff = array();
 	$result = MR\Algorithm::$op($pa, $pb)->getArray();
 
-	// print "PA" . PHP_EOL . json_encode($test_predicates['region_a']) . PHP_EOL;
-	// print "PB" . PHP_EOL . json_encode($test_predicates['region_b']) . PHP_EOL;
-	// print "RS" . PHP_EOL . json_encode($result) . PHP_EOL . PHP_EOL;
+	print "PA" . PHP_EOL . json_encode($test_predicates['region_a']) . PHP_EOL;
+	print "PB" . PHP_EOL . json_encode($test_predicates['region_b']) . PHP_EOL;
+	print "RE" . PHP_EOL . json_encode($expected) . PHP_EOL;
+	print "RS" . PHP_EOL . json_encode($result) . PHP_EOL . PHP_EOL;
 	// continue;
 
 	// soporta como entrada Polygon o MultiPolygon
@@ -170,7 +207,7 @@ foreach( $test as $test_number => $test_predicates ) {
 	//print "RESULT NORMALIZED" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
 	$expected_normalized = MR\GJTools::geojsonToPolygons($expected);
 	// print "EXPECTED NORMALIZED" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
-
+	//exit(1);
 	$ret = MR\GJTools::compareCoordinates($result_normalized, $expected_normalized, $diff);
 
 	if ( $ret ) {
@@ -187,7 +224,7 @@ foreach( $test as $test_number => $test_predicates ) {
 	    print "GOT NORMALIZED" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
 	    // print "GoN: " . json_encode($result) . PHP_EOL;
 	    $fail = true;
-	    exit(1);
+	    // exit(1);
 	}
     }
 }
