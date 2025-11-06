@@ -138,18 +138,34 @@ print json_encode($t_normalized) . PHP_EOL;
 exit(1);
 */
 
+/*
+[[[[0,0],[1,0],[1,1],[0,1],[0,0]]],[[[2,2],[3,2],[3,3],[2,3],[2,2]]],
+[[[0.25,0.25],[2.75,0.25],[2.75,2.75],[0.25,2.75],[0.25,0.25]]]]
+*/
 $diff = [];
 
-$op1 =  [[[[5,5], [5,6], [6,6] ]]];
-$op2 =  [[[[0,0], [1,0], [1,1] ]]]; //[[ [0,0], [0,1], [1,1], [0,0] ]]; //, [[ [2,2], [2,3], [3,3], [2,2] ]] ];
-$op1_mr = MR\Polygon::create()->fillFromArray($op1);
+//$op1 =  [[ [5,5], [5,6], [6,6] ]];
+//$op2 =  [[ [0,0], [1,0], [1,1] ]];
+$op1_1 = [[ [0,0], [0,1], [1,1], [1,0], [0,0] ]];
+$op1_2 = [[ [2,2], [2,3], [3,3], [3,2], [2,2] ]];
+$op2 = [[[0.25,0.25],[2.75,0.25],[2.75,2.75],[0.25,2.75],[0.25,0.25]]];
+
+$op1_mr = MR\Polygon::create()->fillFromArray($op1_1)->fillFromArray($op1_2);
 $op2_mr = MR\Polygon::create()->fillFromArray($op2);
-$result_op = MR\Algorithm::union($op1_mr, $op2_mr)->getArray();
+$result_polygon = MR\Algorithm::union($op1_mr, $op2_mr);
+$result_op = $result_polygon->getArray();
+$result_n = MR\GJTools::geojsonToPolygons($result_op);
 
-print "op1: " . json_encode($op1) . PHP_EOL;
-print "op2: " . json_encode($op2) . PHP_EOL;
-print "rop : " . json_encode($result_op) . PHP_EOL;
+print "op1_1: " . json_encode($op1_1) . PHP_EOL;
+print "op1_1n " . json_encode(MR\GJTools::geojsonToPolygons($op1_1)) . PHP_EOL;
+print "op1_2: " . json_encode($op1_2) . PHP_EOL;
+print "op1_2n " . json_encode(MR\GJTools::geojsonToPolygons($op1_2)) . PHP_EOL;
+print "op2  : " . json_encode($op2) . PHP_EOL;
+print "op2n : " . json_encode(MR\GJTools::geojsonToPolygons($op2)) . PHP_EOL;
+print "rop  : " . json_encode($result_op) . PHP_EOL;
+print "rop_n: " . json_encode($result_n) . PHP_EOL;
 
+//var_dump($result_polygon);
 exit(1);
 
 

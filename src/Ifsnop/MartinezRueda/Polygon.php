@@ -47,6 +47,7 @@ class Polygon {
 
     public function __construct() {
 	//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
+	$this->regions = [];
     }
 
     public static function create() {
@@ -68,7 +69,7 @@ class Polygon {
             }
             $_regions[] = $tmp;
         }
-        $this->regions = $_regions;
+        $this->regions = array_merge($this->regions, $_regions);
         $this->isInverted = $isInverted;
 	return $this;
     }
