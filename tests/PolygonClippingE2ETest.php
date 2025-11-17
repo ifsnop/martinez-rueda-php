@@ -48,7 +48,10 @@ final class PolygonClippingE2ETest extends TestCase
         return abs($a-$b) <= 0.1; //MR\Algorithm::TOLERANCE;
     }
 
-
+    private static function isDebugEnabled(): bool
+    {
+        return in_array('--debug', $_SERVER['argv'] ?? []);
+    }
 
  /**
      * Compara dos arrays de coordenadas estilo MultiPolygon (p.ej. salida de ringsToCoordinates):
@@ -187,7 +190,7 @@ final class PolygonClippingE2ETest extends TestCase
     public static function provideAllCases(): array {
         $root = self::fixturesRoot();
         $ops  = self::opsFilter();
-        $max  = 42; // 42; //self::maxCases();
+        $max  = 142; // 42; //self::maxCases();
 
         $datasets = [];
         $dirs = @scandir($root);
@@ -197,8 +200,8 @@ final class PolygonClippingE2ETest extends TestCase
 
         foreach ($dirs as $d) {
 
-	    if ( false === strpos($d, "multipoly-and-square") )
-		continue;
+	//    if ( false === strpos($d, "multipoly-and-square") )
+	//	continue;
 	//    if ( false === strpos($d, "issue-38") )
 	// f6	continue;
 	//    if ( false === strpos($d, "issue-60-8") )
@@ -235,6 +238,12 @@ final class PolygonClippingE2ETest extends TestCase
         // Tu port ifsnop/MartinezRueda: Polygon::create()->fillFromArray + funciones globales
         $pa = MR\Polygon::create()->fillFromArray($A_mp);
         $pb = MR\Polygon::create()->fillFromArray($B_mp);
+
+	if ( self::isDebugEnabled() ) {
+	    print "pa:\t" . json_encode($pa->getArray()) . PHP_EOL;
+	    print "pb:\t" . json_encode($pb->getArray()) . PHP_EOL;
+	}
+
         switch ($op) {
             case 'union':        return MR\Algorithm::union($pa,$pb)->getArray();
             case 'intersection': return MR\Algorithm::intersect($pa,$pb)->getArray();
@@ -247,31 +256,36 @@ final class PolygonClippingE2ETest extends TestCase
     private static function runOpMulti(array $geomList, string $op): array
     {
 	if (empty($geomList)) return [];
-	print "runOpMulti: " . json_encode($geomList) . PHP_EOL;
+	if ( self::isDebugEnabled() )
+	    print "runOpMulti:\t" . json_encode($geomList) . PHP_EOL;
 
-	foreach($geomList as $k => $geom) {
-	    print "$k => " . json_encode($geom) . PHP_EOL;
-	    print_r($geom);
+	if ( self::isDebugEnabled() ) {
+	    foreach($geomList as $k => $geom) {
+		print "$k =>\t" . json_encode($geom) . PHP_EOL;
+	    }
 	}
 
-exit(1);
-
-	$geomList = $geomList[0];
+	// $geomList = $geomList[0];
 	// Empezamos con la primera geometría como acumulador
 	$acc = $geomList[0];
-	print "acc: " . json_encode($acc) . PHP_EOL;
+	if ( self::isDebugEnabled() )
+	    print "acc 0\t" . json_encode($acc) . PHP_EOL;
 	// Para 'difference' restamos todas las siguientes al sujeto inicial
 	// Para union/intersection/xor reducimos secuencialmente
 	$n = count($geomList);
 	// print "runOpMulti 0: " . json_encode($acc) . PHP_EOL;
 	for ($i = 1; $i < $n; $i++) {
 	    // print "runOpMulti $i: " . json_encode($geomList[$i]) . PHP_EOL;
-	    // print json_encode($geomList[$i]) . PHP_EOL;
+	    if ( self::isDebugEnabled() )
+		print $op . ":\t" . json_encode($geomList[$i]) . PHP_EOL;
 	    $acc = self::runOp($acc, $geomList[$i], $op);
-	    print "$i: " . json_encode($acc) . PHP_EOL;
+	    if ( self::isDebugEnabled() )
+		print "acc $i\t" . json_encode($acc) . PHP_EOL;
 	    // (Opcional) micro‑optimizaciones:
-	    // if ($op === 'intersection' && empty($acc)) break;
+	    if ($op === 'intersection' && empty($acc)) break;
 	}
+	if ( self::isDebugEnabled() )
+	    print "total:\t" . json_encode($acc) . PHP_EOL;
 	return $acc;
     }
 
@@ -280,10 +294,12 @@ exit(1);
      */
     public function testEndToEnd(string $label, string $op, string $argsPath, string $expectedPath): void {
 
-	print "label: $label" . PHP_EOL;
-	print "op: $op" . PHP_EOL;
-	print "argsPath: $argsPath" . PHP_EOL;
-	print "expectedPath: $expectedPath" . PHP_EOL;
+	if ( self::isDebugEnabled() ) {
+	    print "label: $label" . PHP_EOL;
+	    print "op: $op" . PHP_EOL;
+	    print "argsPath: $argsPath" . PHP_EOL;
+	    print "expectedPath: $expectedPath" . PHP_EOL;
+	}
 
         $argsGJ = self::readGeoJSON($argsPath);
         $geoms  = self::geomsFromGeoJSON($argsGJ);
@@ -292,8 +308,9 @@ exit(1);
 //	$input_n = ""; foreach($geoms as $k => $g) $input .= "\top$k => " . json_encode(MR\GJTools::geojsonToPolygons($g)) . PHP_EOL;
 //	$geoms_n = []; foreach($geoms as $k => $g) { $geoms_n[] = MR\GJTools::geojsonToPolygons($g); }
 
-	print $input . PHP_EOL;
-//	print $input_n . PHP_EOL;
+	if ( self::isDebugEnabled() ) {
+	    print $input . PHP_EOL;
+	}
 
         if (count($geoms) < 2) {
             $this->markTestSkipped("[$label] args sin geometrías: $argsPath");
@@ -302,13 +319,17 @@ exit(1);
 	// MR\Algorithm::DEBUG = true;
 
 	$got = self::runOpMulti($geoms, $op);
-	print json_encode($got) . PHP_EOL;exit(1);
+	if ( self::isDebugEnabled() )
+	    print "got:\t" . json_encode($got) . PHP_EOL;
 
 	$got_normalized = MR\GJTools::geojsonToPolygons($got);
-	print "got_n  : " . json_encode($got_normalized) . PHP_EOL . PHP_EOL;
+	if ( self::isDebugEnabled() )
+	    print "got_n:\t" . json_encode($got_normalized) . PHP_EOL;
 
 	$exp_normalized = MR\GJTools::geojsonToPolygons($expectedPath);
-	print "exp    : " . json_encode($exp_normalized) . PHP_EOL . PHP_EOL;
+	if ( self::isDebugEnabled() )
+	    print "exp:\t" . json_encode($exp_normalized) . PHP_EOL . PHP_EOL;
+	// exit(1);
 
 	$diff = [];
 
@@ -316,7 +337,6 @@ exit(1);
 	    self::compareCoordinates($got_normalized, $exp_normalized, $diff),
             "Diferencia detectada" . PHP_EOL .
 	    "input" . PHP_EOL . $input .PHP_EOL .
-	    "input_n" . PHP_EOL . $input_n . PHP_EOL .
             "got" . PHP_EOL . "\t" . json_encode($got_normalized) . PHP_EOL .
             "expected" . PHP_EOL . "\t" . json_encode($exp_normalized) . PHP_EOL .
 	    "diff" . PHP_EOL . "\t" . json_encode($diff) . PHP_EOL
