@@ -199,7 +199,8 @@ final class PolygonClippingE2ETest extends TestCase
         }
 
         foreach ($dirs as $d) {
-
+	//    if ( false === strpos($d, "no-bbox-overlap") )
+	//	continue;
 	//    if ( false === strpos($d, "multipoly-and-square") )
 	//	continue;
 	//    if ( false === strpos($d, "issue-38") )
@@ -257,11 +258,12 @@ final class PolygonClippingE2ETest extends TestCase
     {
 	if (empty($geomList)) return [];
 	if ( self::isDebugEnabled() )
-	    print "runOpMulti:\t" . json_encode($geomList) . PHP_EOL;
+	    print "runOpMulti" . PHP_EOL .
+		"geomLst:" . json_encode($geomList) . PHP_EOL;
 
 	if ( self::isDebugEnabled() ) {
 	    foreach($geomList as $k => $geom) {
-		print "$k =>\t" . json_encode($geom) . PHP_EOL;
+		print "$k:\t" . json_encode($geom) . PHP_EOL;
 	    }
 	}
 
@@ -269,7 +271,7 @@ final class PolygonClippingE2ETest extends TestCase
 	// Empezamos con la primera geometría como acumulador
 	$acc = $geomList[0];
 	if ( self::isDebugEnabled() )
-	    print "acc 0\t" . json_encode($acc) . PHP_EOL;
+	    print "acc 0:\t" . json_encode($acc) . PHP_EOL;
 	// Para 'difference' restamos todas las siguientes al sujeto inicial
 	// Para union/intersection/xor reducimos secuencialmente
 	$n = count($geomList);
@@ -285,7 +287,7 @@ final class PolygonClippingE2ETest extends TestCase
 	    if ($op === 'intersection' && empty($acc)) break;
 	}
 	if ( self::isDebugEnabled() )
-	    print "total:\t" . json_encode($acc) . PHP_EOL;
+	    print "total:\t" . json_encode($acc) . PHP_EOL . PHP_EOL;
 	return $acc;
     }
 
@@ -304,21 +306,21 @@ final class PolygonClippingE2ETest extends TestCase
         $argsGJ = self::readGeoJSON($argsPath);
         $geoms  = self::geomsFromGeoJSON($argsGJ);
 
-	$input = ""; foreach($geoms as $k => $g) $input .= "\top$k => " . json_encode($g) . PHP_EOL;
+	$input = ""; foreach($geoms as $k => $g) $input .= "op $k:\t" . json_encode($g) . PHP_EOL;
 //	$input_n = ""; foreach($geoms as $k => $g) $input .= "\top$k => " . json_encode(MR\GJTools::geojsonToPolygons($g)) . PHP_EOL;
 //	$geoms_n = []; foreach($geoms as $k => $g) { $geoms_n[] = MR\GJTools::geojsonToPolygons($g); }
 
 	if ( self::isDebugEnabled() ) {
-	    print $input . PHP_EOL;
+	    print "testEndToEnd" . PHP_EOL .
+		$input . PHP_EOL;
 	}
 
         if (count($geoms) < 2) {
             $this->markTestSkipped("[$label] args sin geometrías: $argsPath");
         }
-	// Activa el modo debug
-	// MR\Algorithm::DEBUG = true;
 
 	$got = self::runOpMulti($geoms, $op);
+
 	if ( self::isDebugEnabled() )
 	    print "got:\t" . json_encode($got) . PHP_EOL;
 
@@ -329,7 +331,6 @@ final class PolygonClippingE2ETest extends TestCase
 	$exp_normalized = MR\GJTools::geojsonToPolygons($expectedPath);
 	if ( self::isDebugEnabled() )
 	    print "exp:\t" . json_encode($exp_normalized) . PHP_EOL . PHP_EOL;
-	// exit(1);
 
 	$diff = [];
 
@@ -339,7 +340,7 @@ final class PolygonClippingE2ETest extends TestCase
 	    "input" . PHP_EOL . $input .PHP_EOL .
             "got" . PHP_EOL . "\t" . json_encode($got_normalized) . PHP_EOL .
             "expected" . PHP_EOL . "\t" . json_encode($exp_normalized) . PHP_EOL .
-	    "diff" . PHP_EOL . "\t" . json_encode($diff) . PHP_EOL
+	    "diff" . PHP_EOL . "\t" . json_encode($diff) . PHP_EOL . PHP_EOL
         );
     }
 }

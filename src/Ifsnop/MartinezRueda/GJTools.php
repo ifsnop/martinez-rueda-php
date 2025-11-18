@@ -847,6 +847,10 @@ public static function ringsToGeoJSON(
     {
 	$out = [];
 
+	if ( 0 == count($node) ) {
+	    return $out;
+	}
+
 	// Caso raíz sin 'type' pero con 'features' (algunos exportadores)
 	if (!isset($node['type']) && isset($node['features']) && is_array($node['features'])) {
 	    foreach ($node['features'] as $feat) {
