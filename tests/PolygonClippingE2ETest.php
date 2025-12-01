@@ -199,6 +199,10 @@ final class PolygonClippingE2ETest extends TestCase
         }
 
         foreach ($dirs as $d) {
+	//if ( false === strpos($d, "poly-with-hole-and-square") )
+	//    continue;
+	//    if ( false === strpos($d, "multipoly-with-hole-and-square") )
+	//	continue;
 	//    if ( false === strpos($d, "no-bbox-overlap") )
 	//	continue;
 	//    if ( false === strpos($d, "multipoly-and-square") )
