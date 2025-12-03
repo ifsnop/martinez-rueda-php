@@ -53,6 +53,33 @@ final class PolygonClippingE2ETest extends TestCase
         return in_array('--debug', $_SERVER['argv'] ?? []);
     }
 
+    /**
+    * Compara dos arrays de coordenadas estilo MultiPolygon haciendo un XOR,
+    * si los dos arrays son iguales, el resultado debería ser conjunto vacio.
+    * No importa si los polígonos están representados de forma distinta (por
+    * ejemplo un polígono con hueco o dos polígonos que dejan el hueco entre
+    * ellos).
+    *
+    * Se usa como alternativa si la comparación normal no funciona, como última
+    * opción.
+    *
+    * @param array      $coordsA
+    * @param array      $coordsB
+    * @param array|null $diff            (salida) detalles del primer desacuerdo encontrado.
+    * @return bool
+    */
+    public static function comparePolygons(
+	array $coordsA,
+	array $coordsB,
+	?array &$diff = null
+    ): bool {
+	$diff = null;
+
+	$res = self::runOp($coordsA, $coordsB, "xor");
+	$diff = MR\GJTools::geojsonToPolygons($res);
+	return $diff == [];
+    }
+
  /**
      * Compara dos arrays de coordenadas estilo MultiPolygon (p.ej. salida de ringsToCoordinates):
      * [ polygon1, polygon2, ... ], cada polygon = [ exterior, hole1, ... ], cada ring = [ [x,y], ... ]
@@ -339,7 +366,8 @@ final class PolygonClippingE2ETest extends TestCase
 	$diff = [];
 
         $this->assertTrue(
-	    self::compareCoordinates($got_normalized, $exp_normalized, $diff),
+	    self::compareCoordinates($got_normalized, $exp_normalized, $diff) ||
+	    self::comparePolygons($got_normalized, $exp_normalized, $diff),
             "Diferencia detectada" . PHP_EOL .
 	    "input" . PHP_EOL . $input .PHP_EOL .
             "got" . PHP_EOL . "\t" . json_encode($got_normalized) . PHP_EOL .
