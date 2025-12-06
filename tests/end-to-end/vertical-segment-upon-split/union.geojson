@@ -3,7 +3,10 @@
   "properties": {},
   "geometry": {
     "type": "MultiPolygon",
-    "coordinates": [
+    "coordinates": 
+[[[[270,30],[275.340617860256,33.964001022134],[280,30],[280,40],[270,30]]]],
+
+    "_coordinates": [
       [
         [
           [270, 30],
