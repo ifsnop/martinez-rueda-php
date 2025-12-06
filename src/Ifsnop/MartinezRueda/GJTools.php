@@ -229,51 +229,8 @@ final class GJTools
 	if (empty($rings)) {
 	    return [];
 	}
-/*
-	if ($enforceOrientation) {
-	    // Exterior: CCW; Huecos: CW
-	    foreach ($rings as $i => $r) {
-		$area = self::ringSignedArea($r);
-		$isCCW = $area > 0; // Shoelace: >0 => CCW
-
-		if ($i === 0) {
-		    // Exterior debe ser CCW
-		    if (!$isCCW) {
-			$rings[$i] = array_reverse($r);
-		    }
-		} else {
-		    // Hueco debe ser CW
-		    if ($isCCW) {
-			$rings[$i] = array_reverse($r);
-		    }
-		}
-	    }
-	}
-*/
 	return $rings;
     }
-
-    /**
-     * Área orientada mediante fórmula del zapatero (shoelace).
-     * > 0 => CCW, < 0 => CW
-     *
-     * @param array $ring Array de [x,y]
-     * @return float
-     */
-/*
-    private static function ringSignedArea(array $ring): float
-    {
-	$n = count($ring);
-	if ($n < 3) return 0.0;
-
-	$sum = 0.0;
-	for ($i = 0; $i < $n; $i++) {
-	    $j = ($i + 1) % $n;
-	    $sum += ($ring[$i][0] * $ring[$j][1]) - ($ring[$j][0] * $ring[$i][1]);
-	}
-	return $sum / 2.0;
-    }
-*/
 
     /**
      * Flattens a Multipolygon array so we can classify rings (exterior, interior, parent, child)
@@ -519,7 +476,6 @@ final class GJTools
      */
     public static function detectGeometryTypeFromCoordinatesArray(array $coords): string
     {
-	//$coords = json_decode(trim($coordinatesJson), true);
 	//if ($coords === null && json_last_error() !== JSON_ERROR_NONE) {
 	//    throw new InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
 	//}
@@ -684,9 +640,6 @@ final class GJTools
 
         return true;
     }
-
-
-
 
     /**
      * A partir de una lista de rings, calcula:
@@ -978,16 +931,5 @@ final class GJTools
     {
         return (self::signedArea($ring) <= 0) ? $ring : array_reverse($ring);
     }
-
-
-
-
-
-
-
-
-
-
-
 
 }
