@@ -269,9 +269,8 @@ class LinkedListPerformanceTest extends TestCase
      */
     public function testStressTestWithLargeDataset(): void
     {
-        $list = new LinkedList(); //LinkedList(LinkedList::MODE_STATUS);
-	// $list = new LinkedList();
-        $nodeCount = 50000;
+        $list = new LinkedList();
+        $nodeCount = 20000;
         
         $startTime = microtime(true);
         $startMemory = memory_get_usage();

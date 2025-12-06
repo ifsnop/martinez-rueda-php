@@ -13,8 +13,8 @@ use Ifsnop\MartinezRueda\Node;
 class StatusListPerformanceTest extends TestCase
 {
     private const SMALL_DATASET = 100;
-    private const MEDIUM_DATASET = 1000;
-    private const LARGE_DATASET = 10000;
+    private const MEDIUM_DATASET = 5000;
+    private const LARGE_DATASET = 20000;
     
     /**
      * Test: Stress test with very large dataset

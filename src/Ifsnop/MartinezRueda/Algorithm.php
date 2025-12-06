@@ -9,25 +9,6 @@ class Algorithm {
     public static function reverseChain(&$chains, int $index) {
 	$chains[$index] = array_reverse($chains[$index]);
     }
-/*
-    public static function appendChain(&$chains, int $index1, int $index2) {
-	$chain1 = &$chains[$index1];
-	$chain2 = &$chains[$index2];
-	$tail = end($chain1);
-	$tail2 = $chain1[count($chain1) - 2];
-	$head = $chain2[0];
-	$head2 = $chain2[1];
-	if (Point::collinear($tail2, $tail, $head)) {
-	    array_pop($chain1);
-	    $tail = $tail2;
-	}
-	if (Point::collinear($tail, $head, $head2)) {
-	    array_shift($chain2);
-	}
-	$chains[$index1] = array_merge($chain1, $chain2);
-	array_splice($chains, $index2, 1);
-    }
-*/
 
     public static function appendChain(&$chains, int $index1, int $index2) {
 
