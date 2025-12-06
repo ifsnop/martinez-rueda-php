@@ -3,7 +3,11 @@
   "properties": {},
   "geometry": {
     "type": "MultiPolygon",
-    "coordinates": [
+    "coordinates":
+
+[[[[900,0],[950,85],[952.067307692308,81.485576923077],[1000,0],[1000,100],[900,100],[900,0]]]]
+
+    "_coordinates": [
       [
         [
           [900, 0],
