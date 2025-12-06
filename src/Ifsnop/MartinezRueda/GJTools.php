@@ -1066,7 +1066,7 @@ public static function ringsToGeoJSON(
     private static function closeRing(array $ring): array
     {
         if (!is_array($ring) || count($ring) < 3) {
-            throw new \InvalidArgumentException("Anillo inválido.");
+            throw new \InvalidArgumentException("Anillo inválido: " . json_encode($ring), 101);
         }
         $first = $ring[0];
         $last  = $ring[count($ring) - 1];
