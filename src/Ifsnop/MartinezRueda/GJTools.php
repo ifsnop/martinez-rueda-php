@@ -24,8 +24,6 @@ final class GJTools
     */
     public static function geojsonToPolygons($geojsonSource, bool $enforceOrientation = false): array
     {
-
-	// print "ORIGINAL> " . json_encode($geojsonSource) . PHP_EOL;
 	// 1) Cargar/decodificar
 	if (is_string($geojsonSource)) {
 	    if (is_file($geojsonSource)) {
@@ -54,7 +52,6 @@ final class GJTools
 
 	// 2) Recorrer recursivamente y extraer polígonos
 	$polygons = self::extractPolygonsRec($root, $enforceOrientation);
-	// print "POLYGONS> " . json_encode($polygons) . PHP_EOL;
 
 	// 3) Flatten
 	// necesitamos aplanar los rings para tenerlos todos seguidos
@@ -62,46 +59,16 @@ final class GJTools
 
 	// La salida de extract es siempre multipolygon!!
 	// Comprobar si el resultado es Multipolygon o Polygon
-/*	$type = self::detectGeometryTypeFromCoordinatesArray($polygons);
-	print "TYPE> " . $type . PHP_EOL;
-
-	$rings = [];
-        if ($type === 'Polygon') {
-            // $coordinates = [ [ring0], [ring1], ... ]
-            foreach ($polygons as $ring) {
-                $rings[] = $ring;
-            }
-        } elseif ($type === 'MultiPolygon') {
-            // $coordinates = [ [ [ring0], [ring1], ... ], [ [ring0], ... ], ... ]
-            foreach ($polygons as $polygon) {
-                foreach ($polygon as $ring) {
-                    $rings[] = $ring;
-                }
-            }
-        } else {
-            throw new InvalidArgumentException("Tipo no soportado: $type. Usa 'Polygon' o 'MultiPolygon'.");
-        }
-*/
-	// print "flatted>  " . json_encode($polygons) . PHP_EOL; ;
 
 	// averiguar cuales son interior y cuales son exterior, teniendo en cuenta que
 	// los pares son exterior y los impares interior
-
 	$nodes = self::classifyRings($polygons);
-
-	// print "CLASSIF>  " . json_encode($nodes) . PHP_EOL;
-
-
 	$polygons = self::buildPolygons($nodes, $enforceOrientation=true);
-
-	// print "LAST>     " . json_encode($polygons) . PHP_EOL; ;
 
 	// canonicalizePolygons 
         $tol = max(Algorithm::TOLERANCE, PHP_FLOAT_EPSILON);
         $digits = (int) max(0, round(-log10($tol)));
         $polygons = self::canonicalizePolygons($polygons, $digits);
-
-	// print "CANONICAL>     " . json_encode($polygons) . PHP_EOL; ;
 
 	// Asegurar que siempre devolvemos un array (posiblemente vacío)
 	return array_values($polygons);
