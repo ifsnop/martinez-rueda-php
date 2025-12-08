@@ -56,6 +56,7 @@ class LinkedList {
      * @param Node $node Nodo a insertar
      * @param callable $check Función que recibe un Node y retorna bool
      */
+/*
     public function insertBefore(Node $node, callable $check): void {
 	// Desenlaza si ya estaba en una lista (si tienes owner) o si tiene enlaces activos
 	if ($node->previous !== null || $node->next !== null) {
@@ -83,6 +84,48 @@ class LinkedList {
         // No se encontró posición, insertar al final
         $this->linkNodes($previous, $node, null);
     }
+*/
+
+    /**
+     * Inserta un nodo antes del primer nodo que cumpla la condición
+     * Si ningún nodo cumple la condición, lo inserta al final
+     *
+     * @param Node $node Nodo a insertar
+     * @param callable $check Función que recibe un Node y retorna bool
+     */
+public function insertBefore(Node $node, callable $check): void
+{
+    // 1) Garantizar que el nodo no esté enlazado a otra lista
+    if ($node->previous !== null || $node->next !== null) {
+        if (is_callable($node->remove)) {
+            // La closure 'remove' ya actualiza enlaces y pone previous/next a null
+            ($node->remove)();
+        } else {
+            // Fallback por si no existe 'remove'
+            if ($node->previous !== null) {
+                $node->previous->next = $node->next;
+            }
+            if ($node->next !== null) {
+                $node->next->previous = $node->previous;
+            }
+            $node->previous = null;
+            $node->next = null;
+        }
+    }
+
+    // 2) Recorrer hasta encontrar el primer nodo que cumpla $check
+    $prev = $this->root;
+    $curr = $this->root->next;
+
+    while ($curr !== null && !$check($curr)) {
+        $prev = $curr;
+        $curr = $curr->next;
+    }
+
+    // 3) Insertar antes de $curr (si es null, se inserta al final)
+    $this->linkNodes($prev, $node, $curr);
+}
+
 
     /**
      * Encuentra la transición entre dos nodos según una condición

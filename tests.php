@@ -164,6 +164,28 @@ exit(0);
 // el algoritmo devuelve o bien polígonos o bien listas de polígonos, dependiendo
 // del resultado de la operación.
 
+
+$mp = MR\GJTools::geojsonToPolygons("tests/continents_australia.json");
+$pa = MR\Polygon::create()->fillFromArray($mp);
+$mp_normalized = MR\GJTools::geojsonToPolygons($mp);
+
+$shifted_mp = displaceMultiPolygon($mp, -0.5);
+$shifted_pa = MR\Polygon::create()->fillFromArray($shifted_mp);
+
+print "original #" . $pa->numPoints . PHP_EOL;
+print "displaced #" . $shifted_pa->numPoints . PHP_EOL;
+
+$result = MR\Algorithm::xoring($pa, $shifted_pa);
+print "result #" . $result->numPoints . PHP_EOL;
+
+$result_normalized = MR\GJTools::geojsonToPolygons($result->getArray());
+//print json_encode($mp_normalized) . PHP_EOL;
+//exit(0);
+//print json_encode($result_normalized) . PHP_EOL;
+
+exit(0);
+
+
 $fail = false;
 $debug = false;
 foreach( $test as $test_number => $test_predicates ) {
@@ -206,3 +228,75 @@ if ( $fail )
     exit(1);
 
 exit(0);
+
+
+
+/**
+ * Displace all points in a GeoJSON MultiPolygon by a given amount.
+ *
+ * @param array $multiPolygon A MultiPolygon as nested arrays of coordinates:
+ *                            [[[ [x, y], [x, y], ... ] /x ring x/, ...] /x polygon x/, ...]
+ *                            This matches GeoJSONs "coordinates" for MultiPolygon.
+ * @param float $dx Displacement along X (longitude). If $dy is null, this value is used for both x and y.
+ * @param float|null $dy Displacement along Y (latitude). If null, $dy = $dx.
+ * @param bool $closeRings Ensure rings are closed after displacement (last point equals first).
+ * @return array Displaced MultiPolygon (same structure).
+ * @throws InvalidArgumentException If structure is invalid.
+ */
+function displaceMultiPolygon(array $multiPolygon, float $dx, ?float $dy = null, bool $closeRings = true): array
+{
+    if ($dy === null) {
+        $dy = $dx;
+    }
+
+    // Validate minimal structure: must be array of polygons
+    if (!is_array($multiPolygon)) {
+        throw new InvalidArgumentException('MultiPolygon must be an array.');
+    }
+
+    $out = [];
+
+    foreach ($multiPolygon as $polyIndex => $polygon) {
+        if (!is_array($polygon)) {
+            throw new InvalidArgumentException("Polygon #{$polyIndex} must be an array of rings.");
+        }
+
+        $outPolygon = [];
+
+        foreach ($polygon as $ringIndex => $ring) {
+            if (!is_array($ring) || count($ring) < 4) {
+                throw new InvalidArgumentException("Ring #{$ringIndex} in polygon #{$polyIndex} must have at least 4 coordinates (closed linear ring).");
+            }
+
+            $ringOut = [];
+            foreach ($ring as $coordIndex => $coord) {
+                if (!is_array($coord) || count($coord) < 2) {
+                    throw new InvalidArgumentException("Coordinate #{$coordIndex} in ring #{$ringIndex}, polygon #{$polyIndex} must be [x, y].");
+                }
+                $x = $coord[0];
+                $y = $coord[1];
+
+                // Optional: keep extra dimensions (e.g., altitude, measure)
+                $rest = array_slice($coord, 2);
+
+                $ringOut[] = array_values(array_merge([$x + $dx, $y + $dy], $rest));
+            }
+
+            // Ensure ring closure if requested
+            if ($closeRings) {
+                $first = $ringOut[0];
+                $last  = end($ringOut);
+                // Compare x,y only; keep any extra dims from first vertex
+                if ($first[0] !== $last[0] || $first[1] !== $last[1]) {
+                    $ringOut[] = $first;
+                }
+            }
+
+            $outPolygon[] = $ringOut;
+        }
+
+        $out[] = $outPolygon;
+    }
+
+    return $out;
+}

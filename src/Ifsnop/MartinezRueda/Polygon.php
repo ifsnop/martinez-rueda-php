@@ -5,14 +5,15 @@ namespace Ifsnop\MartinezRueda;
 class Polygon {
     public $regions;
     public $isInverted;
+    public $numPoints;
 
     public function __toString():string {
 	$str = "";
 	foreach($this->regions as $region) {
 	    $str .= "[";
-	    $var_dump($region);
+	    // var_dump($region);
 	    foreach($region as $points) {
-		var_dump($points);
+		// var_dump($points);
 		$str .= $points . ",";
 	    }
 	    $str = substr($str, 0, -1) . "],";
@@ -48,6 +49,7 @@ class Polygon {
     public function __construct() {
 	//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	$this->regions = [];
+	$this->numPoints = 0;
     }
 
     public static function create() {
@@ -138,10 +140,12 @@ class Polygon {
 	    foreach ($region as $pt) {
 		if ($pt instanceof Point) {
 		    $tmp[] = $pt;
+		    $this->numPoints++;
 		} elseif (is_array($pt) && count($pt) === 2) {
 		    // Soporta arrays numéricos y asociativos con 2 valores
 		    [$x, $y] = array_values($pt);
 		    $tmp[] = new Point((float)$x, (float)$y);
+		    $this->numPoints++;
 		} else {
 		    throw new \InvalidArgumentException('fillFromArray: punto inválido en anillo.');
 		}

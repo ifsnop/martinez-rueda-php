@@ -53,6 +53,7 @@ class Intersecter {
         ) ? 1 : -1;
     }
 
+/*
     private function eventAdd(Node $ev, Point $otherPt):void {
         $checkFunc = function(Node $here) use ($ev, $otherPt) {
             $comp = $this->eventCompare(
@@ -63,6 +64,54 @@ class Intersecter {
 
         $this->eventRoot->insertBefore($ev, $checkFunc);
     }
+*/
+
+
+private function eventAdd(Node $ev, Point $otherPt): void
+{
+    // Cachear valores de $ev que son invariantes durante la búsqueda
+    $p1IsStart = $ev->isStart;
+    $p11       = $ev->pt;       // punto de este evento
+    $p12       = $otherPt;      // el otro punto de su segmento
+
+    // Closure estática: no captura $this
+    $checkFunc = static function (Node $here) use ($p1IsStart, $p11, $p12): bool {
+        // Cachear propiedades de $here para reducir accesos repetidos
+        $hPt      = $here->pt;
+        $hOtherPt = $here->other->pt;
+        $hIsStart = $here->isStart;
+
+        // === Lógica inlined de eventCompare(...) ===
+        // 1) Orden primario por $p11 vs $hPt
+        $comp = Point::compare($p11, $hPt);
+        if (0 !== $comp) {
+            return $comp < 0;
+        }
+
+        // 2) Si el otro extremo es igual, son el mismo evento → comp=0 → no insertar antes
+        $comp = Point::compare($p12, $hOtherPt);
+        if (0 === $comp) {
+            return false; // equivale a (comp < 0) cuando comp == 0
+        }
+
+        // 3) Si uno es start y el otro end, la prioridad la da isStart
+        if ($p1IsStart !== $hIsStart) {
+            // eventCompare devolvería (p1IsStart ? 1 : -1)
+            // y nosotros devolvemos (comp < 0)
+            return !$p1IsStart; // true si p1 es end (comp = -1)
+        }
+
+        // 4) Geométrico: por encima de la línea => +1; si no => -1
+        // Queremos comp < 0, o sea, NOT "pointAboveOrOnLine"
+        $lineA = $hIsStart ? $hPt : $hOtherPt;
+        $lineB = $hIsStart ? $hOtherPt : $hPt;
+
+        return !Point::pointAboveOrOnLine($p12, $lineA, $lineB);
+    };
+
+    $this->eventRoot->insertBefore($ev, $checkFunc);
+}
+
 
     private function eventAddSegmentStart(Segment $segment, bool $primary): Node {
         $evStart = LinkedList::node(
