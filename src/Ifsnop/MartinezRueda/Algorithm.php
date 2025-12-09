@@ -16,7 +16,7 @@ class Algorithm {
         $exists1 = array_key_exists($index1, $chains);
         $exists2 = array_key_exists($index2, $chains);
 
-
+	/*
 	if (Algorithm::DEBUG) {
             echo "appendChain: index1=$index1 index2=$index2 | chainsCount=" . count($chains) . "\n";
 	    if ($exists1) {
@@ -30,13 +30,15 @@ class Algorithm {
 	        echo "  chain2 before: (NO EXISTE index2)\n";
     	    }
         }
-
+	*/
 	// Si alguno no existe, no sigas: el problema está en el caller
         if (!$exists1 || !$exists2) {
+	    /*
 	    if (Algorithm::DEBUG) {
     	        echo "  [WARN] appendChain abortado: índice(s) inexistente(s). "
         	   . "Probable stale index tras un array_splice anterior en esta misma iteración.\n";
             }
+	    */
             return; // Solo para depurar: evita notice y nos deja pista
         }
 
@@ -49,13 +51,13 @@ class Algorithm {
         $head2 = $chain2[1];
 
 	if (Point::collinear($tail2, $tail, $head)) {
-    	    if (Algorithm::DEBUG) echo "  collinear(tail2,tail,head): pop tail of chain1\n";
+    	    // if (Algorithm::DEBUG) echo "  collinear(tail2,tail,head): pop tail of chain1\n";
 	    	array_pop($chain1);
     	    $tail = $tail2;
         }
 
 	if (Point::collinear($tail, $head, $head2)) {
-    	    if (Algorithm::DEBUG) echo "  collinear(tail,head,head2): shift head of chain2\n";
+    	    // if (Algorithm::DEBUG) echo "  collinear(tail,head,head2): shift head of chain2\n";
 	    array_shift($chain2);
         }
 
@@ -63,10 +65,10 @@ class Algorithm {
 	$chains[$index1] = array_merge($chain1, $chain2);
         array_splice($chains, $index2, 1);
 
-	if (Algorithm::DEBUG) {
+	//if (Algorithm::DEBUG) {
     	    // echo "  chain1 after:  " . chainEndsStr($chains[$index1]) . "\n";
-            echo "  chains count now: " . count($chains) . "\n";
-        }
+        //    echo "  chains count now: " . count($chains) . "\n";
+        //}
     }
 
 
@@ -188,7 +190,7 @@ class Algorithm {
 public static function segmentChainer(array $segments): array {
     $regions = [];
     $chains = [];
-
+/*
     if (Algorithm::DEBUG) {
         echo "=== segmentChainer: START ===\n";
         // Lista de segmentos de entrada
@@ -205,15 +207,17 @@ public static function segmentChainer(array $segments): array {
             if ($d > 2) echo "VERTEX_DEG>2 $k deg=$d\n";
         }
     }
+*/
 
     foreach ($segments as $k => $segment) {
         $point1 = $segment->start;
         $point2 = $segment->end;
         if ($point1->__eq($point2)) {
-            if (Algorithm::DEBUG) echo "Skip zero-length segment at k=$k\n";
+            //if (Algorithm::DEBUG) echo "Skip zero-length segment at k=$k\n";
             continue;
         }
 
+/*
         if (Algorithm::DEBUG) {
             echo "\n-- k=$k SEG " . segstr($segment) . " --\n";
             echo "Current chains: " . count($chains) . "\n";
@@ -221,7 +225,7 @@ public static function segmentChainer(array $segments): array {
                 echo "  chain[$ci] " . chainEndsStr($c) . "\n";
             }
         }
-
+*/
         $segmentChainerMatcher = new SegmentChainerMatcher();
 
         for ($i = 0; $i < count($chains); $i++) {
@@ -230,23 +234,23 @@ public static function segmentChainer(array $segments): array {
             $tail = end($chain);
 
             if ($head->__eq($point1)) {
-                if (Algorithm::DEBUG) echo "  MATCH head==P1 with chain[$i]\n";
+                //if (Algorithm::DEBUG) echo "  MATCH head==P1 with chain[$i]\n";
                 if ($segmentChainerMatcher->setMatch($i, true, true)) { break; }
             } elseif ($head->__eq($point2)) {
-                if (Algorithm::DEBUG) echo "  MATCH head==P2 with chain[$i]\n";
+                //if (Algorithm::DEBUG) echo "  MATCH head==P2 with chain[$i]\n";
                 if ($segmentChainerMatcher->setMatch($i, true, false)) { break; }
             } elseif ($tail->__eq($point1)) {
-                if (Algorithm::DEBUG) echo "  MATCH tail==P1 with chain[$i]\n";
+                //if (Algorithm::DEBUG) echo "  MATCH tail==P1 with chain[$i]\n";
                 if ($segmentChainerMatcher->setMatch($i, false, true)) { break; }
             } elseif ($tail->__eq($point2)) {
-                if (Algorithm::DEBUG) echo "  MATCH tail==P2 with chain[$i]\n";
+                //if (Algorithm::DEBUG) echo "  MATCH tail==P2 with chain[$i]\n";
                 if ($segmentChainerMatcher->setMatch($i, false, false)) { break; }
             }
         }
 
         // 0 matches: crea nueva cadena
         if ($segmentChainerMatcher->nextMatch === $segmentChainerMatcher->firstMatch) {
-            if (Algorithm::DEBUG) echo "  -> 0 matches: NEW CHAIN with " . pstr($point1) . ' + ' . pstr($point2) . "\n";
+            //if (Algorithm::DEBUG) echo "  -> 0 matches: NEW CHAIN with " . pstr($point1) . ' + ' . pstr($point2) . "\n";
             $chains[] = [$point1, $point2];
             continue;
         }
@@ -263,29 +267,29 @@ public static function segmentChainer(array $segments): array {
             $grow2 = $addToHead ? $chain[1]               : $chain[count($chain)-2];
             $opposite  = $addToHead ? end($chain)         : $chain[0];
             $opposite2 = $addToHead ? $chain[count($chain)-2] : $chain[1];
-
+/*
             if (Algorithm::DEBUG) {
                 echo "  -> 1 match: chain[$index] addToHead=" . ($addToHead?'YES':'NO') .
                      " point=" . pstr($point) . "\n";
                 echo "     grow=" . pstr($grow) . " grow2=" . pstr($grow2) .
                      " opposite=" . pstr($opposite) . " opposite2=" . pstr($opposite2) . "\n";
             }
-
+*/
             if (Point::collinear($grow2, $grow, $point)) {
-                if (Algorithm::DEBUG) echo "     collinear(grow2,grow,point): trimming " . ($addToHead?'HEAD':'TAIL') . "\n";
+                //if (Algorithm::DEBUG) echo "     collinear(grow2,grow,point): trimming " . ($addToHead?'HEAD':'TAIL') . "\n";
                 if ($addToHead) { array_shift($chain); } else { array_pop($chain); }
                 $grow = $grow2;
             }
 
             if ($opposite == $point) {
-                if (Algorithm::DEBUG) echo "     OPPOSITE==POINT: CLOSE REGION (before trim)\n";
+                //if (Algorithm::DEBUG) echo "     OPPOSITE==POINT: CLOSE REGION (before trim)\n";
                 array_splice($chains, $index, 1);
 
                 if (Point::collinear($opposite2, $opposite, $grow)) {
-                    if (Algorithm::DEBUG) echo "     collinear(opposite2,opposite,grow): trimming " . ($addToHead?'TAIL':'HEAD') . "\n";
+                    //if (Algorithm::DEBUG) echo "     collinear(opposite2,opposite,grow): trimming " . ($addToHead?'TAIL':'HEAD') . "\n";
                     if ($addToHead) { array_pop($chain); } else { array_shift($chain); }
                 }
-                if (Algorithm::DEBUG) echo "     CLOSED REGION: " . regionStr($chain) . "\n";
+                //if (Algorithm::DEBUG) echo "     CLOSED REGION: " . regionStr($chain) . "\n";
                 $regions[] = $chain;
                 continue;
             }
@@ -295,7 +299,7 @@ public static function segmentChainer(array $segments): array {
             } else {
                 $chain[] = $point;
             }
-            if (Algorithm::DEBUG) echo "     chain[$index] now " . chainEndsStr($chain) . "\n";
+            //if (Algorithm::DEBUG) echo "     chain[$index] now " . chainEndsStr($chain) . "\n";
             continue;
         }
 
@@ -304,7 +308,7 @@ public static function segmentChainer(array $segments): array {
         $secondIndex = $segmentChainerMatcher->secondMatch->index;
 
         $reverseFirst = count($chains[$firstIndex]) < count($chains[$secondIndex]);
-
+/*
         if (Algorithm::DEBUG) {
             echo "  -> 2 matches: first=" . matcherStr($segmentChainerMatcher->firstMatch) .
                  " second=" . matcherStr($segmentChainerMatcher->secondMatch) . "\n";
@@ -313,40 +317,40 @@ public static function segmentChainer(array $segments): array {
                 echo "     WARNING: SAME_CHAIN in two matches! (esto debería cerrar región, no auto-merge)\n";
             }
         }
-
+*/
         if ($segmentChainerMatcher->firstMatch->matchesHead) {
             if ($segmentChainerMatcher->secondMatch->matchesHead) {
                 if ($reverseFirst) {
-                    if (Algorithm::DEBUG) echo "     CASE: head + head (reverse FIRST) -> appendChain(first, second)\n";
+                    //if (Algorithm::DEBUG) echo "     CASE: head + head (reverse FIRST) -> appendChain(first, second)\n";
                     self::reverseChain($chains, $firstIndex);
                     self::appendChain($chains, $firstIndex, $secondIndex);
                 } else {
-                    if (Algorithm::DEBUG) echo "     CASE: head + head (reverse SECOND) -> appendChain(second, first)\n";
+                    //if (Algorithm::DEBUG) echo "     CASE: head + head (reverse SECOND) -> appendChain(second, first)\n";
                     self::reverseChain($chains, $secondIndex);
                     self::appendChain($chains, $secondIndex, $firstIndex);
                 }
             } else {
-                if (Algorithm::DEBUG) echo "     CASE: head + tail -> appendChain(second, first)\n";
+                //if (Algorithm::DEBUG) echo "     CASE: head + tail -> appendChain(second, first)\n";
                 self::appendChain($chains, $secondIndex, $firstIndex);
             }
         } else {
             if ($segmentChainerMatcher->secondMatch->matchesHead) {
-                if (Algorithm::DEBUG) echo "     CASE: tail + head -> appendChain(first, second)\n";
+                //if (Algorithm::DEBUG) echo "     CASE: tail + head -> appendChain(first, second)\n";
                 self::appendChain($chains, $firstIndex, $secondIndex);
             } else {
                 if ($reverseFirst) {
-                    if (Algorithm::DEBUG) echo "     CASE: tail + tail (reverse FIRST) -> appendChain(second, first)\n";
+                    //if (Algorithm::DEBUG) echo "     CASE: tail + tail (reverse FIRST) -> appendChain(second, first)\n";
                     self::reverseChain($chains, $firstIndex);
                     self::appendChain($chains, $secondIndex, $firstIndex);
                 } else {
-                    if (Algorithm::DEBUG) echo "     CASE: tail + tail (reverse SECOND) -> appendChain(first, second)\n";
+                    //if (Algorithm::DEBUG) echo "     CASE: tail + tail (reverse SECOND) -> appendChain(first, second)\n";
                     self::reverseChain($chains, $secondIndex);
                     self::appendChain($chains, $firstIndex, $secondIndex);
                 }
             }
         }
     }
-
+/*
     if (Algorithm::DEBUG) {
         echo "\n=== segmentChainer: END ===\n";
         echo "Regions built: " . count($regions) . "\n";
@@ -358,7 +362,7 @@ public static function segmentChainer(array $segments): array {
             echo "  chain[$ci] " . chainEndsStr($c) . "\n";
         }
     }
-
+*/
     return $regions;
 }
 
@@ -432,6 +436,7 @@ public static function segmentChainer(array $segments): array {
 	$s = self::segmentChainer($segments->segments);
 	// 2) POST-PROCESO: parte anillos auto-tocados en ciclos simples
 	$s = self::splitSelfTouchingRegions($s);
+/*
 	if (Algorithm::DEBUG) {
 	    echo "After splitSelfTouchingRegions:\n";
 	    foreach ($s as $ri => $reg) {
@@ -441,6 +446,7 @@ public static function segmentChainer(array $segments): array {
 	        echo implode(' -> ', $pts) . " -> " . (string)$reg[0] . " (closed)\n";
 	    }
 	}
+*/
 	// 3) Construye el polígono final
 	$p = Polygon::create()->fillFromArray($s, $segments->isInverted);
 	return $p;
@@ -464,9 +470,9 @@ public static function segmentChainer(array $segments): array {
         	if (count($r) >= 3) { $out[] = $r; }
     	    }
 	}
-	if (Algorithm::DEBUG) {
-    	    echo "splitSelfTouchingRegions: in=" . count($regions) . " out=" . count($out) . PHP_EOL;
-	}
+	//if (Algorithm::DEBUG) {
+    	//    echo "splitSelfTouchingRegions: in=" . count($regions) . " out=" . count($out) . PHP_EOL;
+	//}
 	return $out;
     }
 
@@ -509,12 +515,12 @@ public static function segmentChainer(array $segments): array {
         	    if (count($ring2) >= 2 && end($ring2)->__eq($ring2[0])) {
         	        array_pop($ring2);
         	    }
-
+/*
             	    if (Algorithm::DEBUG) {
         		echo "__splitRegionAtDuplicates: split at i=$i j=$j "
         	           . "ring1=" . count($ring1) . " ring2=" . count($ring2) . PHP_EOL;
             	    }
-
+*/
             	    // Recursivo por si aún quedan más puntos repetidos en alguno
     	            $out = [];
         	    foreach (self::__splitRegionAtDuplicates($ring1) as $r1) {

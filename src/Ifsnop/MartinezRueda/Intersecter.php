@@ -8,7 +8,7 @@ class Intersecter {
 
     public function __construct(bool $selfIntersection) {
         $this->selfIntersection = $selfIntersection;
-        $this->eventRoot = new LinkedList();
+        $this->eventRoot = new StatusList();
     }
 
     public function newSegment(Point $start, Point $end): Segment {
@@ -114,7 +114,7 @@ private function eventAdd(Node $ev, Point $otherPt): void
 
 
     private function eventAddSegmentStart(Segment $segment, bool $primary): Node {
-        $evStart = LinkedList::node(
+        $evStart = StatusList::node(
             new Node(
                 isStart :true,
                 pt : $segment->start,
@@ -129,7 +129,7 @@ private function eventAdd(Node $ev, Point $otherPt): void
     }
 
     private function eventAddSegmentEnd(Node $evStart, Segment $segment, bool $primary): void {
-        $evEnd = LinkedList::node(
+        $evEnd = StatusList::node(
             new Node(
                 isStart : false,
                 pt : $segment->end,
