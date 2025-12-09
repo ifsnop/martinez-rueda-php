@@ -22,7 +22,7 @@ final class GJTools
      * @return array Array de polígonos: [ [ [ [x,y], ... ], [holeRing], ... ], ... ]
      * @throws InvalidArgumentException Si el JSON no es válido o el objeto no es GeoJSON válido.
     */
-    public static function geojsonToPolygons($geojsonSource, bool $enforceOrientation = false): array
+    public static function geojsonToArray($geojsonSource, bool $enforceOrientation = false): array
     {
 	// 1) Cargar/decodificar
 	if (is_string($geojsonSource)) {

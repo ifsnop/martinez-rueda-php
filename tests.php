@@ -165,9 +165,9 @@ exit(0);
 // del resultado de la operación.
 
 
-$mp = MR\GJTools::geojsonToPolygons("tests/continents_europe.json");
+$mp = MR\GJTools::geojsonToArray("tests/continents_europe.json");
 $pa = MR\Polygon::create()->fillFromArray($mp);
-$mp_normalized = MR\GJTools::geojsonToPolygons($mp);
+$mp_normalized = MR\GJTools::geojsonToArray($mp);
 
 $shifted_mp = displaceMultiPolygon($mp, -0.5);
 $shifted_pa = MR\Polygon::create()->fillFromArray($shifted_mp);
@@ -175,15 +175,26 @@ $shifted_pa = MR\Polygon::create()->fillFromArray($shifted_mp);
 print "original #" . $pa->numPoints . PHP_EOL;
 print "displaced #" . $shifted_pa->numPoints . PHP_EOL;
 
-$result = MR\Algorithm::xoring($pa, $shifted_pa);
+$result = MR\Algorithm::xoring($pa, $shifted_pa); // devuelve un class Polygon
 print "result #" . $result->numPoints . PHP_EOL;
+/*
+$result_normalized = MR\GJTools::geojsonToArray($result->getArray()); // devuelve un array
 
-$result_normalized = MR\GJTools::geojsonToPolygons($result->getArray());
-//print json_encode($mp_normalized) . PHP_EOL;
+$result_normalized_pa = MR\Polygon::create()->fillFromArray($result_normalized);
+//print json_encode($result_normalized) . PHP_EOL;
+
+$shifted_re = displaceMultiPolygon($result_normalized, -0.5);
+$shifted_pa2 = MR\Polygon::create()->fillFromArray($shifted_re);
+
+$result = MR\Algorithm::xoring($result_normalized_pa, $shifted_pa2);
+print "result 2#" . $result->numPoints . PHP_EOL;
+*/
+//$result_normalized = MR\GJTools::geojsonToPolygons($result->getArray());
+///print json_encode($mp_normalized) . PHP_EOL;
 //exit(0);
 //print json_encode($result_normalized) . PHP_EOL;
 
-exit(0);
+//exit(0);
 
 
 $fail = false;
@@ -202,9 +213,9 @@ foreach( $test as $test_number => $test_predicates ) {
 	if ( $debug ) print "RS" . PHP_EOL . json_encode($result) . PHP_EOL . PHP_EOL;
 
 	// soporta como entrada Polygon o MultiPolygon
-	$result_normalized = MR\GJTools::geojsonToPolygons($result);
+	$result_normalized = MR\GJTools::geojsonToArray($result);
 	// print "RESULT NORMALIZED" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
-	$expected_normalized = MR\GJTools::geojsonToPolygons($expected);
+	$expected_normalized = MR\GJTools::geojsonToArray($expected);
 	// print "EXPECTED NORMALIZED" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
 	//exit(1);
 	$ret = MR\GJTools::compareCoordinates($result_normalized, $expected_normalized, $diff);
@@ -213,8 +224,8 @@ foreach( $test as $test_number => $test_predicates ) {
 	    print "Result PASS {$test_number} {$op}" . PHP_EOL;
 	} else {
 	    print "Result FAIL {$test_number} {$op}" . PHP_EOL;
-	    print "OPA" . PHP_EOL . json_encode(MR\GJTools::geojsonToPolygons($test_predicates['region_a'])) . PHP_EOL; // MR\GJTools::ringsToCoordinates($test_predicates['region_a'])[0]) . PHP_EOL;
-	    print "OPB" . PHP_EOL . json_encode(MR\GJTools::geojsonToPolygons($test_predicates['region_b'])) . PHP_EOL; // MR\GJTools::ringsToCoordinates($test_predicates['region_a'])[0]) . PHP_EOL;
+	    print "OPA" . PHP_EOL . json_encode(MR\GJTools::geojsonToArray($test_predicates['region_a'])) . PHP_EOL; // MR\GJTools::ringsToCoordinates($test_predicates['region_a'])[0]) . PHP_EOL;
+	    print "OPB" . PHP_EOL . json_encode(MR\GJTools::geojsonToArray($test_predicates['region_b'])) . PHP_EOL; // MR\GJTools::ringsToCoordinates($test_predicates['region_a'])[0]) . PHP_EOL;
 	    print "EXPECTED" . PHP_EOL . json_encode($expected) . PHP_EOL;
 	    print "GOT" . PHP_EOL . json_encode($result) . PHP_EOL;
 	    print "EXPECTED NORMALIZED" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;

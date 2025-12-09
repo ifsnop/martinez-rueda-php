@@ -76,7 +76,7 @@ final class PolygonClippingE2ETest extends TestCase
 	$diff = null;
 
 	$res = self::runOp($coordsA, $coordsB, "xor");
-	$diff = MR\GJTools::geojsonToPolygons($res);
+	$diff = MR\GJTools::geojsonToArray($res);
 	return $diff == [];
     }
 
@@ -355,11 +355,11 @@ final class PolygonClippingE2ETest extends TestCase
 	if ( self::isDebugEnabled() )
 	    print "got:\t" . json_encode($got) . PHP_EOL;
 
-	$got_normalized = MR\GJTools::geojsonToPolygons($got);
+	$got_normalized = MR\GJTools::geojsonToArray($got);
 	if ( self::isDebugEnabled() )
 	    print "got_n:\t" . json_encode($got_normalized) . PHP_EOL;
 
-	$exp_normalized = MR\GJTools::geojsonToPolygons($expectedPath);
+	$exp_normalized = MR\GJTools::geojsonToArray($expectedPath);
 	if ( self::isDebugEnabled() )
 	    print "exp:\t" . json_encode($exp_normalized) . PHP_EOL . PHP_EOL;
 
