@@ -216,13 +216,13 @@ private function eventAdd(Node $ev, Point $otherPt): void
         //return Point::pointAboveOrOnLine($a1, $b1, $b2) ? 1 : -1;
 
 	$a1OnB = Point::collinear($a1, $b1, $b2);
-	$a2OnB = Point::collinear($a2, $b1, $b2);
 
 	// para evitar 0, esto sería un desempate estable:
 	//if ($a1OnB && $a2OnB)
 	//    return $ev1 === $ev2 ? 0 : (\spl_object_id($ev1) < \spl_object_id($ev2) ? -1 : 1);
 
 	if ($a1OnB) {
+	    $a2OnB = Point::collinear($a2, $b1, $b2);
 	    if ($a2OnB) {
 		// Igualdad geométrica: 0 o desempate estable
 		//die("este caso es una optimización de copilot, anteriormente se devolvía 1\n");
