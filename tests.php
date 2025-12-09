@@ -165,7 +165,7 @@ exit(0);
 // del resultado de la operación.
 
 
-$mp = MR\GJTools::geojsonToPolygons("tests/continents_australia.json");
+$mp = MR\GJTools::geojsonToPolygons("tests/continents_europe.json");
 $pa = MR\Polygon::create()->fillFromArray($mp);
 $mp_normalized = MR\GJTools::geojsonToPolygons($mp);
 
