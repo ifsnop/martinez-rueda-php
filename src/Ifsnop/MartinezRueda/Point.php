@@ -48,12 +48,16 @@ final class Point {
      * La comparación es primero por x, luego por y.
      */
     public static function compare(Point $point1, Point $point2) {
-        if (abs($point1->x - $point2->x) < Algorithm::TOLERANCE) {
-            return abs($point1->y - $point2->y) < Algorithm::TOLERANCE
-                ? 0
-                : ($point1->y < $point2->y ? -1 : 1);
+	$eps = Algorithm::TOLERANCE;
+	$dx = $point1->x - $point2->x;
+        if (abs($dx) < $eps) {
+	    $dy = $point1->y - $point2->y;
+	    if ( abs($dy) < $eps ) {
+		return 0;
+	    }
+            return ($dy < 0.0) ? -1 : 1;
         }
-        return $point1->x < $point2->x ? -1 : 1;
+        return ($dx < 0.0) ? -1 : 1;
     }
 
     /*
@@ -64,10 +68,14 @@ final class Point {
      * https://github.com/Henry00IS/ShapeEditor/commit/5584b25914ff53a773e4517482a028aab2cd8f1e
      */
     public static function pointAboveOrOnLine(Point $point, Point $left, Point $right) {
-        return (
-            (($right->x - $left->x) * ($point->y - $left->y)) -
-            (($right->y - $left->y) * ($point->x - $left->x))
-        ) >= -Algorithm::TOLERANCE;
+
+	$rx = $right->x; $ry = $right->y;
+        $lx = $left->x;  $ly = $left->y;
+        $px = $point->x; $py = $point->y;
+
+        // Orientación (signo del área): >= -eps ⇒ sobre o por encima
+        $orient = (($rx - $lx) * ($py - $ly)) - (($ry - $ly) * ($px - $lx));
+        return $orient >= -Algorithm::TOLERANCE;
     }
 
     /*
@@ -139,17 +147,21 @@ final class Point {
      *  2 → fuera por la derecha.
      */
     private static function __calcAlongUsingValue(float $value) {
-        if ($value <= -Algorithm::TOLERANCE) {
+	$eps = Algorithm::TOLERANCE;
+        if ($value <= -$eps) {
             return -2;
-        } elseif ($value < Algorithm::TOLERANCE) {
-            return -1;
-        } elseif ($value - 1 <= -Algorithm::TOLERANCE) {
-            return 0;
-        } elseif ($value - 1 < Algorithm::TOLERANCE) {
-            return 1;
-        } else {
-            return 2;
         }
+	if ($value < $eps) {
+            return -1;
+        }
+	$d1 = $value - 1.0;
+	if ($d1 <= -$eps) {
+            return 0;
+        }
+	if ($d1 < $eps) {
+            return 1;
+        }
+        return 2;
     }
 
     /*
@@ -159,8 +171,9 @@ final class Point {
         if (!($other instanceof Point)) {
             return false;
         }
-        return abs($this->x - $other->x) < Algorithm::TOLERANCE &&
-               abs($this->y - $other->y) < Algorithm::TOLERANCE;
+	$eps = Algorithm::TOLERANCE;
+        return abs($this->x - $other->x) < $eps &&
+               abs($this->y - $other->y) < $eps;
     }
 
     /*
