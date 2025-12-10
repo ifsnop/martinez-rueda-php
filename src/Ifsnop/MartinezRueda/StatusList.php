@@ -36,8 +36,6 @@ final class StatusList
     
     public function insertBefore(Node $node, callable $check): void
     {
-        //if (Algorithm::DEBUG) print __METHOD__ . PHP_EOL;
-        
         $pos = $this->binSearchFirstTrue($check);
         $this->arrayInsertAt($pos, $node);
         
@@ -49,8 +47,6 @@ final class StatusList
     
     public function findTransition(callable $check): Transition
     {
-        //if (Algorithm::DEBUG) print __METHOD__ . PHP_EOL;
-
         $pos = $this->binSearchFirstTrue($check);
         $count = \count($this->arr);
         $before = ($pos > 0) ? $this->arr[$pos - 1] : null;
