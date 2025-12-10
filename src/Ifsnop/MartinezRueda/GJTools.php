@@ -5,9 +5,6 @@ namespace Ifsnop\MartinezRueda;
 
 final class GJTools
 {
-    /** Offset para el punto de prueba interior (evitar caer justo en borde) */
-    private const TEST_OFFSET = 1e-12;
-
     /**
      * Convierte un GeoJSON (archivo, string JSON o estructura ya decodificada) en un array normalizado de polígonos.
      *
