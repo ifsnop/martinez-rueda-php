@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class SegmentChainerMatcher {
+final class SegmentChainerMatcher {
     public $firstMatch;
     public $secondMatch;
     public $nextMatch;

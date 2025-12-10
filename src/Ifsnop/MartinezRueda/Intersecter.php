@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
@@ -191,6 +192,7 @@ class Intersecter {
         //call_user_func($ev->other->remove);
 	($ev->other->remove)();
         $ev->seg->end = $end;
+	$ev->seg->recalcBounds();
         $ev->other->pt = $end;
         $this->eventAdd($ev->other, $ev->pt);
     }
@@ -230,31 +232,18 @@ class Intersecter {
         return $statusRoot->findTransition($checkFunc);
     }
 
-    /**
-     * Rechazo temprano por bounding box antes de linesIntersect (gran ahorro).
-     */
-    private static function bboxOverlap(Point $a1, Point $a2, Point $b1, Point $b2): bool
-    {
-        $ax1 = min($a1->x, $a2->x);
-        $ax2 = max($a1->x, $a2->x);
-        $ay1 = min($a1->y, $a2->y);
-        $ay2 = max($a1->y, $a2->y);
-
-        $bx1 = min($b1->x, $b2->x);
-        $bx2 = max($b1->x, $b2->x);
-        $by1 = min($b1->y, $b2->y);
-        $by2 = max($b1->y, $b2->y);
-
-        // Si no solapan en x o y, no pueden intersectar
-        return !($ax2 < $bx1 || $bx2 < $ax1 || $ay2 < $by1 || $by2 < $ay1);
-    }
-
-
     // Nota: -2/+2 significan que la proyección cae fuera del segmento lejos del extremo.
     // Solo actuamos para {-1,0,1}: -1/1 dividimos en el extremo; 0 dividimos en el punto interior.
     private function checkIntersection(Node $ev1, Node $ev2): ?Node {
         $seg1 = $ev1->seg;
         $seg2 = $ev2->seg;
+
+
+	// --- Rechazo temprano por AABB cacheada ---
+	if ($seg1->maxX < $seg2->minX || $seg2->maxX < $seg1->minX ||
+	    $seg1->maxY < $seg2->minY || $seg2->maxY < $seg1->minY) {
+	    return null;
+	}
 
         $a1 = $seg1->start;
         $a2 = $seg1->end;
@@ -262,9 +251,9 @@ class Intersecter {
         $b2 = $seg2->end;
 
 	// Rechazo temprano por bbox
-	if (!self::bboxOverlap($a1, $a2, $b1, $b2)) {
-            return null;
-        }
+	//if (!self::bboxOverlap($a1, $a2, $b1, $b2)) {
+        //    return null;
+        //}
 
         $i = Point::linesIntersect($a1, $a2, $b1, $b2);
         if ($i === null) {
@@ -426,7 +415,7 @@ class Intersecter {
                         $cursor = $surrounding->after; // nodo de StatusList (no el ev)
                         while ($cursor !== null) {
 			    $curEv = $cursor->ev;
-			    if ($curEv !== null && $curEV->primary === $ev->primary) {
+			    if ($curEv !== null && $curEv->primary === $ev->primary) {
 				$sameBelowEv = $curEv;
                                 break;
                             }

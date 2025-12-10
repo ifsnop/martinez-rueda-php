@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class Point {
+final class Point {
     /* Coordenadas privadas del punto */
     public $x;
     public $y;

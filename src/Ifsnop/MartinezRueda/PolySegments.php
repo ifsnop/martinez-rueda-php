@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class PolySegments {
+final class PolySegments {
     public $segments;
     public $isInverted;
 

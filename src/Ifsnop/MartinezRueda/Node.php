@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class Node {
+final class Node {
     public $status;
     public $other;
     public $ev;

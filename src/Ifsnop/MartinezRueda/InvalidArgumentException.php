@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class InvalidArgumentException extends \Exception
+final class InvalidArgumentException extends \Exception
 {
     private string $prettyTrace;
 
@@ -14,7 +15,6 @@ class InvalidArgumentException extends \Exception
         bool $includeArgs = false
     ) {
         parent::__construct($message, $code, $previous);
-
         // El backtrace de Exception ya está listo tras parent::__construct().
         $trace = $includeArgs
             ? $this->getTrace() // cuidado con datos sensibles
@@ -26,12 +26,7 @@ class InvalidArgumentException extends \Exception
             error_log($this->composeLogMessage());
         }
     }
-/*
-    public function getPrettyTrace(): string
-    {
-        return $this->prettyTrace;
-    }
-*/
+
     public function __toString(): string
     {
         return sprintf(

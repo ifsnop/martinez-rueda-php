@@ -1,11 +1,12 @@
 <?php
+declare(strict_types=1);
 
 // Define el espacio de nombres (namespace) donde se encuentra esta clase.
 // Esto ayuda a evitar conflictos de nombres en proyectos grandes.
 namespace Ifsnop\MartinezRueda;
 
 // Se declara una clase llamada Fill.
-class Fill {
+final class Fill {
     // Se definen dos propiedades públicas: $below y $above.
     public $below;
     public $above;

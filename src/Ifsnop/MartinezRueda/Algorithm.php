@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class Algorithm {
+final class Algorithm {
     public const TOLERANCE = 1e-12; //12; //9;
     public const DEBUG = false;
 

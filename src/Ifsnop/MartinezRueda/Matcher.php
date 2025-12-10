@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class Matcher {
+final class Matcher {
     public $index;
     public $matchesHead;
     public $matchesPt1;

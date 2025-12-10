@@ -1,7 +1,9 @@
 <?php
+declare(strict_types=1);
+
 namespace Ifsnop\MartinezRueda;
 
-class Debug
+final class Debug
 {
     public static function on(): bool {
         return defined(Algorithm::class . '::DEBUG') && Algorithm::DEBUG;

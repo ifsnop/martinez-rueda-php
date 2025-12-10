@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class Polygon {
+final class Polygon {
     public $regions;
     public $isInverted;
     public $numPoints;

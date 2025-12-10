@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class IntersectionPoint {
+final class IntersectionPoint {
     public $alongA;
     public $alongB;
     public $point;

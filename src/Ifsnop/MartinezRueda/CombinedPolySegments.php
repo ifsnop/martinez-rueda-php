@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class CombinedPolySegments {
+final class CombinedPolySegments {
     public $combined;
     public $isInverted1;
     public $isInverted2;

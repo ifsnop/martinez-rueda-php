@@ -1,5 +1,6 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class PolyBoolException extends \Exception {}
+final class PolyBoolException extends \Exception {}

@@ -36,7 +36,7 @@ final class GJToolsTest extends TestCase
             ],
         ];
 
-        $out = GJTools::geojsonToPolygons($gj);
+        $out = GJTools::geojsonToArray($gj);
         $this->assertCount(1, $out);
         $this->assertCount(1, $out[0]); // 1 anillo
 	$this->assertEqualsWithDelta([[[0,0], [10,0], [10,10], [0,10], [0,0]]], $out[0], 0.01);
@@ -55,7 +55,7 @@ final class GJToolsTest extends TestCase
             ],
         ];
 
-        $out = GJTools::geojsonToPolygons($gj);
+        $out = GJTools::geojsonToArray($gj);
         $this->assertCount(1, $out);          // un polígono
         $this->assertCount(2, $out[0]);       // 1 exterior + 1 hueco
         // 3D reducido a 2D y cierre eliminado
@@ -82,7 +82,7 @@ final class GJToolsTest extends TestCase
             ],
         ];
 
-        $out = GJTools::geojsonToPolygons($gj);
+        $out = GJTools::geojsonToArray($gj);
         $this->assertCount(2, $out);
         $this->assertCount(1, $out[0]);
         $this->assertCount(2, $out[1]);
@@ -102,7 +102,7 @@ final class GJToolsTest extends TestCase
             ]
         ];
 
-        $out = GJTools::geojsonToPolygons($gj);
+        $out = GJTools::geojsonToArray($gj);
         $this->assertCount(1, $out);
         $this->assertPolygonStructure($out);
     }
@@ -147,7 +147,7 @@ final class GJToolsTest extends TestCase
             ],
         ];
 
-        $out = GJTools::geojsonToPolygons($gj);
+        $out = GJTools::geojsonToArray($gj);
         $this->assertCount(2, $out); // solo extrae polígonos
         $this->assertPolygonStructure($out);
     }
@@ -176,7 +176,7 @@ final class GJToolsTest extends TestCase
             ]
         ];
 
-        $out = GJTools::geojsonToPolygons($gj);
+        $out = GJTools::geojsonToArray($gj);
         $this->assertCount(2, $out);
         $this->assertPolygonStructure($out);
     }
@@ -189,7 +189,7 @@ final class GJToolsTest extends TestCase
             'properties' => [],
         ];
 
-        $out = GJTools::geojsonToPolygons($gj);
+        $out = GJTools::geojsonToArray($gj);
         $this->assertCount(0, $out);
 
         $weird = [
@@ -207,7 +207,7 @@ final class GJToolsTest extends TestCase
             ]
         ];
 
-        $out2 = GJTools::geojsonToPolygons($weird);
+        $out2 = GJTools::geojsonToArray($weird);
         $this->assertCount(1, $out2);
         $this->assertPolygonStructure($out2);
     }
@@ -226,7 +226,7 @@ final class GJToolsTest extends TestCase
 
 	$this->expectException(\InvalidArgumentException::class);
 	$this->expectExceptionCode(101);
-        $out = GJTools::geojsonToPolygons($gj);
+        $out = GJTools::geojsonToArray($gj);
         // exterior válido tras filtrar: [ [5,0],[5,5],[0,5],[0,0] ] o similar si (0,'a') se descarta
         //$this->assertCount(1, $out);
         //$this->assertCount(1, $out[0]); // hueco degenerado eliminado
@@ -247,8 +247,8 @@ final class GJToolsTest extends TestCase
             ],
         ];
 
-        $outNo = GJTools::geojsonToPolygons($gj, false);
-        $outYes = GJTools::geojsonToPolygons($gj, true);
+        $outNo = GJTools::geojsonToArray($gj, false);
+        $outYes = GJTools::geojsonToArray($gj, true);
 
         // Sin enforcement, las orientaciones se mantienen
         $this->assertNotEmpty($outNo);
@@ -278,14 +278,14 @@ final class GJToolsTest extends TestCase
 
         $json = json_encode($geo);
 
-        $outFromString = GJTools::geojsonToPolygons($json);
+        $outFromString = GJTools::geojsonToArray($json);
         $this->assertCount(1, $outFromString);
 
         // Escribir a archivo temporal
         $tmp = tempnam(sys_get_temp_dir(), 'gj_');
         file_put_contents($tmp, $json);
         try {
-            $outFromFile = GJTools::geojsonToPolygons($tmp);
+            $outFromFile = GJTools::geojsonToArray($tmp);
             $this->assertCount(1, $outFromFile);
             $this->assertEquals($outFromString, $outFromFile);
         } finally {
@@ -296,7 +296,7 @@ final class GJToolsTest extends TestCase
     public function testInvalidJsonThrows(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        GJTools::geojsonToPolygons('{invalid json}');
+        GJTools::geojsonToArray('{invalid json}');
     }
 
     /** ===== Helpers internos del test ===== */

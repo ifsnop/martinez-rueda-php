@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class SegmentIntersecter extends Intersecter {
+final class SegmentIntersecter extends Intersecter {
     public function __construct() {
         parent::__construct(false);
     }

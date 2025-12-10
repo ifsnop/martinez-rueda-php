@@ -1,8 +1,9 @@
 <?php
+declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-class Transition {
+final class Transition {
     public $after;
     public $before;
     public $insert;
