@@ -682,7 +682,7 @@ public static function segmentChainer(array $segments): array {
 
 
 function pstr(Point $p): string {
-    return '[' . $p->getX() . ',' . $p->getY() . ']';
+    return '[' . $p->x . ',' . $p->y . ']';
 }
 
 function segstr($s): string {

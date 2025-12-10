@@ -32,25 +32,32 @@ class Intersecter {
         Point $p22
     ):int {
         $comp = Point::compare($p11, $p21);
-        if ( 0 != $comp ) {
+        if ( 0 !== $comp ) {
             return $comp;
         }
 
         $comp = Point::compare($p12, $p22);
         // if ($p12 == $p22) {
-	if ( 0 == $comp ) {
+	if ( 0 === $comp ) {
             return 0;
         }
 
-        if ($p1IsStart != $p2IsStart) {
+        if ($p1IsStart !== $p2IsStart) {
 	    // CAMBIO 4
             return $p1IsStart ? 1 : -1; // CAMBIO
             // return $p1IsStart ? -1 : 1; // ORIGINAL
         }
+	if ( $p2IsStart ) {
+	    $lA = $p21;
+	    $lB = $p22;
+	} else {
+	    $lA = $p22;
+	    $lB = $p21;
+	}
+	//$lA = $p2IsStart ? $p21 : $p22;
+	//$lB = $p2IsStart ? $p22 : $p21;
 
-        return Point::pointAboveOrOnLine(
-            $p12, $p2IsStart ? $p21 : $p22, $p2IsStart ? $p22 : $p21
-        ) ? 1 : -1;
+        return Point::pointAboveOrOnLine($p12, $lA, $lB) ? 1 : -1;
     }
 
 /*
@@ -67,50 +74,57 @@ class Intersecter {
 */
 
 
-private function eventAdd(Node $ev, Point $otherPt): void
-{
-    // Cachear valores de $ev que son invariantes durante la búsqueda
-    $p1IsStart = $ev->isStart;
-    $p11       = $ev->pt;       // punto de este evento
-    $p12       = $otherPt;      // el otro punto de su segmento
+    private function eventAdd(Node $ev, Point $otherPt): void
+    {
+	// Cachear valores de $ev que son invariantes durante la búsqueda
+	$p1IsStart = $ev->isStart;
+	$p11       = $ev->pt;       // punto de este evento
+	$p12       = $otherPt;      // el otro punto de su segmento
 
-    // Closure estática: no captura $this
-    $checkFunc = static function (Node $here) use ($p1IsStart, $p11, $p12): bool {
-        // Cachear propiedades de $here para reducir accesos repetidos
-        $hPt      = $here->pt;
-        $hOtherPt = $here->other->pt;
-        $hIsStart = $here->isStart;
+	// Closure estática: no captura $this
+	$checkFunc = static function (Node $here) use ($p1IsStart, $p11, $p12): bool {
+	    // Cachear propiedades de $here para reducir accesos repetidos
+	    $hPt      = $here->pt;
+	    $hOtherPt = $here->other->pt;
+	    $hIsStart = $here->isStart;
 
-        // === Lógica inlined de eventCompare(...) ===
-        // 1) Orden primario por $p11 vs $hPt
-        $comp = Point::compare($p11, $hPt);
-        if (0 !== $comp) {
-            return $comp < 0;
-        }
+	    // === Lógica inlined de eventCompare(...) ===
+	    // 1) Orden primario por $p11 vs $hPt
+	    $comp = Point::compare($p11, $hPt);
+	    if (0 !== $comp) {
+		return $comp < 0;
+	    }
 
-        // 2) Si el otro extremo es igual, son el mismo evento → comp=0 → no insertar antes
-        $comp = Point::compare($p12, $hOtherPt);
-        if (0 === $comp) {
-            return false; // equivale a (comp < 0) cuando comp == 0
-        }
+	    // 2) Si el otro extremo es igual, son el mismo evento → comp=0 → no insertar antes
+	    $comp = Point::compare($p12, $hOtherPt);
+	    if (0 === $comp) {
+		return false; // equivale a (comp < 0) cuando comp == 0
+	    }
 
-        // 3) Si uno es start y el otro end, la prioridad la da isStart
-        if ($p1IsStart !== $hIsStart) {
-            // eventCompare devolvería (p1IsStart ? 1 : -1)
-            // y nosotros devolvemos (comp < 0)
-            return !$p1IsStart; // true si p1 es end (comp = -1)
-        }
+	    // 3) Si uno es start y el otro end, la prioridad la da isStart
+	    if ($p1IsStart !== $hIsStart) {
+		// eventCompare devolvería (p1IsStart ? 1 : -1)
+		// y nosotros devolvemos (comp < 0)
+		return !$p1IsStart; // true si p1 es end (comp = -1)
+	    }
 
-        // 4) Geométrico: por encima de la línea => +1; si no => -1
-        // Queremos comp < 0, o sea, NOT "pointAboveOrOnLine"
-        $lineA = $hIsStart ? $hPt : $hOtherPt;
-        $lineB = $hIsStart ? $hOtherPt : $hPt;
+	    // 4) Geométrico: por encima de la línea => +1; si no => -1
+	    // Queremos comp < 0, o sea, NOT "pointAboveOrOnLine"
+	    if ( $hIsStart ) {
+		$lineA = $hPt;
+		$lineB = $hOtherPt;
+	    } else {
+		$lineA = $hOtherPt;
+		$lineB = $hPt;
+	    }
+	    //$lineA = $hIsStart ? $hPt : $hOtherPt;
+	    //$lineB = $hIsStart ? $hOtherPt : $hPt;
 
-        return !Point::pointAboveOrOnLine($p12, $lineA, $lineB);
-    };
+	    return !Point::pointAboveOrOnLine($p12, $lineA, $lineB);
+	};
 
-    $this->eventRoot->insertBefore($ev, $checkFunc);
-}
+	$this->eventRoot->insertBefore($ev, $checkFunc);
+    }
 
 
     private function eventAddSegmentStart(Segment $segment, bool $primary): Node {
@@ -183,50 +197,26 @@ private function eventAdd(Node $ev, Point $otherPt): void
 
     private function eventDivide(Node $ev, Point $pt): Node {
 
-	//Debug::log("DIVIDE ask: at %s over %s", Debug::p($pt), Debug::segStr($ev->seg));
-
 	// No dividir en los extremos: evita segmentos de longitud 0
-	// CAMBIO 1
-	if ($pt->__eq($ev->seg->start) || $pt->__eq($ev->seg->end)) {
-	    //Debug::log("DIVIDE skip (end/start): %s", Debug::p($pt));
+	$seg = $ev->seg;
+	if ($pt->__eq($seg->start) || $pt->__eq($seg->end)) {
 	    return $ev; // o $ev->other; cualquiera es válido aquí
 	}
 	// División real
-        $ns = $this->segmentCopy($pt, $ev->seg->end, $ev->seg);
-
-	//Debug::log("DIVIDE do  : new tail %s", Debug::segStr($ns));
+        $ns = $this->segmentCopy($pt, $seg->end, $seg);
 
         $this->eventUpdateEnd($ev, $pt);
-        $ret = $this->eventAddSegment($ns, $ev->primary);
-	//Debug::log("DIVIDE done: head now %s | tail %s", Debug::segStr($ev->seg), Debug::segStr($ns)); Debug::dumpEventQueue($this->eventRoot);
-	return $ret;
+        return $this->eventAddSegment($ns, $ev->primary);
     }
 
-    private function statusCompare(Node $ev1, Node $ev2): int {
-	// if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
+    private static function statusCompare(Node $ev1, Node $ev2): int {
         $a1 = $ev1->seg->start; $a2 = $ev1->seg->end;
         $b1 = $ev2->seg->start; $b2 = $ev2->seg->end;
-	// Cambio recomendado (arreglar antisimetria en statusCompare
-        //if (Point::collinear($a1, $b1, $b2)) {
-        //    if (Point::collinear($a2, $b1, $b2)) {
-        //        return 1;
-        //    }
-        //    return Point::pointAboveOrOnLine($a2, $b1, $b2) ? 1 : -1;
-        //}
-        //return Point::pointAboveOrOnLine($a1, $b1, $b2) ? 1 : -1;
 
-	$a1OnB = Point::collinear($a1, $b1, $b2);
-
-	// para evitar 0, esto sería un desempate estable:
-	//if ($a1OnB && $a2OnB)
-	//    return $ev1 === $ev2 ? 0 : (\spl_object_id($ev1) < \spl_object_id($ev2) ? -1 : 1);
-
-	if ($a1OnB) {
-	    $a2OnB = Point::collinear($a2, $b1, $b2);
-	    if ($a2OnB) {
+	if ( Point::collinear($a1, $b1, $b2) ) {
+	    if ( Point::collinear($a2, $b1, $b2) ) {
 		// Igualdad geométrica: 0 o desempate estable
-		//die("este caso es una optimización de copilot, anteriormente se devolvía 1\n");
-		return 0; // o usar identidad de objetos si prefieres estabilidad estricta
+		return 0;
 	    }
 	    return Point::pointAboveOrOnLine($a2, $b1, $b2) ? 1 : -1;
 	}
@@ -234,11 +224,29 @@ private function eventAdd(Node $ev, Point $otherPt): void
     }
 
     private function statusFindSurrounding(StatusList $statusRoot, Node $ev): ?Transition { // ?Node {
-        $checkFunc = function(Node $here) use ($ev) {
-            return $this->statusCompare($ev, $here->ev) > 0;
+        $checkFunc = static function(Node $here) use ($ev):bool {
+            return self::statusCompare($ev, $here->ev) > 0;
         };
-
         return $statusRoot->findTransition($checkFunc);
+    }
+
+    /**
+     * Rechazo temprano por bounding box antes de linesIntersect (gran ahorro).
+     */
+    private static function bboxOverlap(Point $a1, Point $a2, Point $b1, Point $b2): bool
+    {
+        $ax1 = min($a1->x, $a2->x);
+        $ax2 = max($a1->x, $a2->x);
+        $ay1 = min($a1->y, $a2->y);
+        $ay2 = max($a1->y, $a2->y);
+
+        $bx1 = min($b1->x, $b2->x);
+        $bx2 = max($b1->x, $b2->x);
+        $by1 = min($b1->y, $b2->y);
+        $by2 = max($b1->y, $b2->y);
+
+        // Si no solapan en x o y, no pueden intersectar
+        return !($ax2 < $bx1 || $bx2 < $ax1 || $ay2 < $by1 || $by2 < $ay1);
     }
 
 
@@ -248,35 +256,26 @@ private function eventAdd(Node $ev, Point $otherPt): void
         $seg1 = $ev1->seg;
         $seg2 = $ev2->seg;
 
-	//Debug::log("CHECK XSEC: %s  WITH  %s", Debug::segStr($seg1), Debug::segStr($seg2));
-
         $a1 = $seg1->start;
         $a2 = $seg1->end;
         $b1 = $seg2->start;
         $b2 = $seg2->end;
 
+	// Rechazo temprano por bbox
+	if (!self::bboxOverlap($a1, $a2, $b1, $b2)) {
+            return null;
+        }
+
         $i = Point::linesIntersect($a1, $a2, $b1, $b2);
         if ($i === null) {
             if (!Point::collinear($a1, $a2, $b1)) {
-		//Debug::log("  → no-intersection (skew)");
                 return null;
             }
-	    //Debug::log("  → collinear overlap candidate");
-
-            //if ($a1 == $b2 || $a2 == $b1) {
-            //    return null;
-            //}
-            //$a1EquB1 = $a1 == $b1;
-            //$a2EquB2 = $a2 == $b2;
-
-	    // CAMBIO 2
 	    if ($a1->__eq($b2) || $a2->__eq($b1)) {
-		//Debug::log("  → touching endpoints only (no action)");
  		return null;
 	    }
 	    $a1EquB1 = $a1->__eq($b1);
 	    $a2EquB2 = $a2->__eq($b2);
-
 
             if ($a1EquB1 && $a2EquB2) {
                 return $ev2;
@@ -287,14 +286,14 @@ private function eventAdd(Node $ev, Point $otherPt): void
 
             if ($a1EquB1) {
                 if ($a2Between) {
-		    //Debug::log("  → divide ev2 at a2");
                     $this->eventDivide($ev2, $a2);
                 } else {
-		    //Debug::log("  → divide ev1 at b2");
                     $this->eventDivide($ev1, $b2);
                 }
                 return $ev2;
-            } elseif ($a1Between) {
+            }
+
+	    if ($a1Between) {
                 if (!$a2EquB2) {
                     if ($a2Between) {
                         $this->eventDivide($ev2, $a2);
@@ -305,29 +304,21 @@ private function eventAdd(Node $ev, Point $otherPt): void
                 $this->eventDivide($ev2, $a1);
             }
         } else { // $i != null
-		//Debug::log("  → proper-xsec at %s (alongA=%d, alongB=%d)",Debug::p($i->point), $i->alongA, $i->alongB);
-
-            if ($i->alongA == 0) {
-                if ($i->alongB == -1) {
-		    //Debug::log("    div ev1 at b1");
+            if ($i->alongA === 0) {
+                if ($i->alongB === -1) {
                     $this->eventDivide($ev1, $b1);
-                } elseif ($i->alongB == 0) {
-		    //Debug::log("    div ev1 at i");
+                } elseif ($i->alongB === 0) {
                     $this->eventDivide($ev1, $i->point);
-                } elseif ($i->alongB == 1) {
-		    //Debug::log("    div ev1 at b2");
+                } elseif ($i->alongB === 1) {
                     $this->eventDivide($ev1, $b2);
                 }
             }
-            if ($i->alongB == 0) {
-                if ($i->alongA == -1) {
-		    //Debug::log("    div ev2 at a1");
+            if ($i->alongB === 0) {
+                if ($i->alongA === -1) {
                     $this->eventDivide($ev2, $a1);
-                } elseif ($i->alongA == 0) {
-		    //Debug::log("    div ev2 at i");
+                } elseif ($i->alongA === 0) {
                     $this->eventDivide($ev2, $i->point);
-                } elseif ($i->alongA == 1) {
-		    //Debug::log("    div ev2 at a2");
+                } elseif ($i->alongA === 1) {
                     $this->eventDivide($ev2, $a2);
                 }
             }
@@ -342,32 +333,19 @@ private function eventAdd(Node $ev, Point $otherPt): void
                 return $eve;
             }
         }
-        if ($below !== null) {
-            return $this->checkIntersection($ev, $below);
-        }
-        return null;
+        return $below !== null ? $this->checkIntersection($ev, $below) : null;
     }
 
     public function calculate(bool $primaryPolyInverted, bool $secondaryPolyInverted): array {
-	// if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-        // $statusRoot = new LinkedList();
-	$statusRoot = new StatusList(); // LinkedList(LinkedList::MODE_STATUS);
+	$statusRoot = new StatusList();
         $segments = [];
 
-        // $cnt = 0;
-
         while (!$this->eventRoot->isEmpty()) {
-            // echo __METHOD__.":cnt=".$cnt . PHP_EOL;
-            // $cnt++;
-            $ev = $this->eventRoot->getHead();
-	    //Debug::log("POP EVENT : %s", Debug::evStr($ev));
-
-            if ($ev->isStart) {
-
-
-		// Backup: si un segmento degenerado ha entrado, detectarlo aquí también
+	    $ev = $this->eventRoot->getHead();
+	    if ($ev->isStart) {
+	    // Backup: si un segmento degenerado ha entrado, detectarlo aquí también
 		if ($ev->seg !== null && $ev->seg->start->__eq($ev->seg->end)) {
-		    //Debug::log("!! START WITH ZERO-LEN SEG: %s", Debug::segStr($ev->seg));
+		//Debug::log("!! START WITH ZERO-LEN SEG: %s", Debug::segStr($ev->seg));
 		    throw new PolyBoolException(
 			"PolyBool: Zero-length segment detected during processing; check input/TOLERANCE"
 		    );
@@ -376,21 +354,17 @@ private function eventAdd(Node $ev, Point $otherPt): void
                 $surrounding = $this->statusFindSurrounding($statusRoot, $ev);
 
 		if ($surrounding === null || !is_object($surrounding) || !is_callable($surrounding->insert ?? null)) {
-		    throw new PolyBoolException('Invalid Transition from StatusList::findTransition');
+		    throw new PolyBoolException(
+			"Invalid Transition from StatusList::findTransition"
+		    );
 		}
 
                 $above = $surrounding->before !== null ? $surrounding->before->ev : null;
                 $below = $surrounding->after !== null ? $surrounding->after->ev : null;
 
-		//Debug::log("  SURR: above=%s | below=%s", Debug::evStr($above), Debug::evStr($below));
-
-                // if ( null === $above ) print __METHOD__.":above=null" . PHP_EOL; else print __METHOD__.":above!=null" . PHP_EOL;
-                // if ( null === $below ) print __METHOD__.":below=null" . PHP_EOL; else print __METHOD__.":below!=null" . PHP_EOL;
-
                 $eve = $this->checkBothIntersections($above, $ev, $below);
                 if ($eve !== null) {
 
-		    //Debug::log("  → Intersection handled; removing ev & ev.other");
                     if ($this->selfIntersection) {
                         $toggle = false;
                         if (/*$ev->seg->myFill === null || */$ev->seg->myFill->below === null) {
@@ -418,45 +392,45 @@ private function eventAdd(Node $ev, Point $otherPt): void
 
                 if ($this->selfIntersection) {
                     $toggle = false;
-                    if ($ev->seg === null || $ev->seg->myFill === null || $ev->seg->myFill->below === null) {
+		    $seg = $ev->seg;
+		    $mf = $seg->myFill;
+                    if ($seg === null || $mf === null || $mf->below === null) {
                         $toggle = true;
                     } else {
-                        $toggle = $ev->seg->myFill->above !== $ev->seg->myFill->below;
+                        $toggle = $mf->above !== $mf->below;
                     }
 
                     if ($below === null) {
-                        $ev->seg->myFill->below = $primaryPolyInverted;
+                        $mf->below = $primaryPolyInverted;
                     } else {
-                        $ev->seg->myFill->below = $below->seg->myFill->above;
+                        $mf->below = $below->seg->myFill->above;
                     }
 
                     if ($toggle) {
-                        $ev->seg->myFill->above = !$ev->seg->myFill->below;
+                        $mf->above = !$mf->below;
                     } else {
-                        $ev->seg->myFill->above = $ev->seg->myFill->below;
+                        $mf->above = $mf->below;
                     }
 
 		    //Debug::log("  FILL(self): my[below=%s, above=%s]", $ev->seg->myFill->below ? '1':'0', $ev->seg->myFill->above ? '1':'0');
-
                 } else { // !$this->selfIntersection
 
-		    // NUEVO NUEVO NUEVO
-		    // Sugerencia de COPILOT para evitar utilizar sementos no inicializados
-		    // nos ha aparecido al ejecutar unos casos de prueba de COPILOT
+		    // Evitar utilizar sementos no inicializados
 		    if ($ev->seg->myFill === null) {
 			$ev->seg->myFill = new Fill();
 		    }
 
 		    if ($ev->seg->myFill->below === null || $ev->seg->myFill->above === null) {
 			// Buscar el vecino inferior del MISMO polígono en el status
-                         $sameBelowEv = null;
-                         $cursor = $surrounding->after; // nodo de StatusList (no el ev)
-                         while ($cursor !== null) {
-                             if ($cursor->ev !== null && $cursor->ev->primary === $ev->primary) {
-                                 $sameBelowEv = $cursor->ev;
-                                 break;
-                             }
-                             $cursor = $cursor->next;
+                        $sameBelowEv = null;
+                        $cursor = $surrounding->after; // nodo de StatusList (no el ev)
+                        while ($cursor !== null) {
+			    $curEv = $cursor->ev;
+			    if ($curEv !== null && $curEV->primary === $ev->primary) {
+				$sameBelowEv = $curEv;
+                                break;
+                            }
+			    $cursor = $cursor->next;
                          }
                          $baseline = $ev->primary ? $primaryPolyInverted : $secondaryPolyInverted;
                          $belowInsideOwn =
@@ -470,11 +444,11 @@ private function eventAdd(Node $ev, Point $otherPt): void
 		    // 2) Asegurar otherFill (interior respecto al otro polígono), como ya hacías
 
 		    if ($ev->seg->otherFill === null) {
-                	$inside = false;
+            		$inside = false;
 			if ($below === null) {
-			    $inside = $ev->primary ? $secondaryPolyInverted : $primaryPolyInverted;
+	    		    $inside = $ev->primary ? $secondaryPolyInverted : $primaryPolyInverted;
                         } else {
-                            if ($ev->primary === $below->primary) {
+	                    if ($ev->primary === $below->primary) {
                                 if ($below->seg->otherFill === null) {
                                     // defensivo: evita null deref
                                     $below->seg->otherFill = new Fill(false, false);
@@ -486,80 +460,15 @@ private function eventAdd(Node $ev, Point $otherPt): void
                         }
 
 			$ev->seg->otherFill = new Fill($inside, $inside);
-                     }
-                 }
+		    }
+		}
 
-/*
-                    if ($ev->seg->otherFill === null) {
-                        $inside = false;
-                        if ($below === null) {
-                            $inside = $ev->primary ? $secondaryPolyInverted : $primaryPolyInverted;
-			    //Debug::log("  otherFill from border: inside=%s", $inside ? '1':'0');
-                        } else {
-
-
-			    // Si el segmento inferior es del mismo polígono, es posible que aún no tenga otherFill.
-			    if ($ev->primary === $below->primary) {
-				if ($below->seg->otherFill === null) {
-				    // Estrategia 1 (defensiva): inicialización conservadora
-				    $below->seg->otherFill = new Fill(false, false);
-				}
-				$inside = $below->seg->otherFill->above;
-			    } else {
-				$inside = $below->seg->myFill->above;
-			    }
-
-//			    if (!$this->selfIntersection && $below !== null && $ev->primary === $below->primary && $below->seg->otherFill === null) {
-//				// O bien: inicialización conservadora
-//				$below->seg->otherFill = new Fill(false, false);
-//				// O si prefieres detectar el caso en test:
-//				// throw new PolyBoolException('otherFill no inicializado en segmento inferior (no self-intersection)');
-//			    }
-//
-//                            $inside = $ev->primary === $below->primary ? $below->seg->otherFill->above : $below->seg->myFill->above;
-//
-//			    //Debug::log("  otherFill from below(%s): inside=%s", $below->primary ? 'P':'S', $inside ? '1':'0');
-//
-
-                        }
-                        $ev->seg->otherFill = new Fill($inside, $inside);
-                    }
-
-
-		//    if ($ev->seg->otherFill === null) {
-		//	$inside = false;
-		//	if ($below === null) {
-		//	    $inside = $ev->primary ? $secondaryPolyInverted : $primaryPolyInverted;
-		//	} else {
-		//	    if ($ev->primary === $below->primary) {
-		//		// misma procedencia → usamos el estado "respecto al otro polígono"
-		//		$inside = $below->seg->otherFill?->above ?? false;
-		//	    } else {
-		//		// distinta procedencia:
-		//		// preferimos myFill si ya se definió; si no, caemos a otherFill (que sí existe en START)
-		//		$inside = $below->seg->myFill?->above
-		//		    ?? $below->seg->otherFill?->above
-		//		    ?? false;
-		//	    }
-		//	}
-		//	$ev->seg->otherFill = new Fill($inside, $inside);
-		//    }
-                }
-		
-		//$ev->other->status = call_user_func_array(
-		//    $surrounding->insert,
-		//    array(StatusList::node(new Node(ev : $ev)))
-		//);
-		*/
 		$ev->other->status = ($surrounding->insert)(StatusList::node(new Node(ev : $ev)));
-		//Debug::log("  INSERT status for %s", Debug::evStr($ev));
-		//Debug::dumpStatus($statusRoot);
-
-            } else { // !$ev->isStart
-                $st = $ev->status;
-		// en lugar de lanzar simplemente la excepcion, comprobamos si hubo un problema al tratar
-		// los certices por estar mal orientados (que ya no debería pasar por el parche que
-		// hemos implementado de copilot. sea como sea, hacemos el error más amable.
+	    } else { // !$ev->isStart
+        	$st = $ev->status;
+	// en lugar de lanzar simplemente la excepcion, comprobamos si hubo un problema al tratar
+	// los certices por estar mal orientados (que ya no debería pasar por el parche que
+	// hemos implementado de copilot. sea como sea, hacemos el error más amable.
                 if ($st === null) {
 		    $lenZero = $ev->seg !== null && $ev->seg->start->__eq($ev->seg->end);
 		    $detail  = $lenZero ? 'zero-length segment' : 'end event reached before its start (segment orientation?)';
@@ -570,71 +479,17 @@ private function eventAdd(Node $ev, Point $otherPt): void
 		    //Debug::log("  CHECK neighbors intersection (prev-next)");
                     $this->checkIntersection($st->previous->ev, $st->next->ev);
                 }
-		// call_user_func($st->remove);
 		($st->remove)();
 
-		//Debug::log("  REMOVE from status: %s", Debug::evStr($ev));
-		//Debug::dumpStatus($statusRoot);
-
-                if (!$ev->primary) {
-                    $s = $ev->seg->myFill;
-                    $ev->seg->myFill = $ev->seg->otherFill;
-                    $ev->seg->otherFill = $s;
-
-		    //Debug::log("  SWAP fills (secondary end)");
+		if (!$ev->primary) {
+		    $s = $ev->seg->myFill;
+		    $ev->seg->myFill = $ev->seg->otherFill;
+		    $ev->seg->otherFill = $s;
 		}
-
-                $segments[] = $ev->seg;
-
-		//Debug::log("  PUSH SEG: %s", Debug::segStr($ev->seg));
-
-            }
-            //call_user_func($this->eventRoot->getHead()->remove);
+		$segments[] = $ev->seg;
+	    }
 	    ($this->eventRoot->getHead()->remove)();
-
-	    //Debug::log("  POP head done; events left=%d", $this->eventRoot->size());
-
-        }
-        // print_r($segments);
-        // var_dump($segments);
-
-	//Debug::log("CALC DONE: %d segments output", count($segments));
-
+	}
         return $segments;
     }
-/*
-    // usado en intersecter cuando hay un polígono encima de otro
-    // En la rama no self-intersection de tu Intersecter::calculate() (cuando 
-    // selfIntersection === false), el inside que asignas a otherFill del segmento
-    // se calcula leyendo los fills del vecino below:
-    // if ($below === null) {    $inside = $ev->primary ? $secondaryPolyInverted : $primaryPolyInverted;} 
-    // else {    $inside = $ev->primary === $below->primary        ? $below->seg->otherFill->above        : 
-    // $below->seg->myFill->above;   // ← cuando el vecino es del otro polígono}$ev->seg->otherFill = new Fill($inside, $inside);
-    // Problema: cuando el below es del otro polígono, con frecuencia su myFill todavía no está inicializado
-    // (en tu flujo se inicializa para el polígono secundario cuando llega su END por el swap, y
-    // el polígono primario ni siquiera lo inicializa en la rama no-self).
-    // Así, en subtramos donde debería dar true (p. ej., el vertical de A entre (4,2)-(4,4),
-    // que está dentro de B), obtienes false.
-    private function parityInsideAtPosition(
-    StatusList $statusRoot,
-    ?Node $after,           // nodo de StatusList que queda justo "debajo" del hueco de inserción (surrounding->after)
-    bool $otherPrimary,     // true si el "otro" polígono es primary, false si es secondary
-    bool $otherPolyInverted // primaryPolyInverted o secondaryPolyInverted según corresponda
-): bool {
-    // Baseline = fuera si no hay cruces (o invertido si así se pide)
-    $inside = $otherPolyInverted;
-
-    $cur = $statusRoot->getHead(); // primer nodo del status (StatusList::getHead)
-    while ($cur !== null && $cur !== $after) {
-        if ($cur->ev !== null && $cur->ev->primary === $otherPrimary) {
-            // Cada borde del otro polígono cambia el estado inside/outside
-            $inside = !$inside;
-        }
-        $cur = $cur->next;
-    }
-    return $inside;
-}
-
-*/
-
 }

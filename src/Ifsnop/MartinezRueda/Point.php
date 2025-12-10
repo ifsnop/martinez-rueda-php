@@ -4,8 +4,8 @@ namespace Ifsnop\MartinezRueda;
 
 class Point {
     /* Coordenadas privadas del punto */
-    private $x;
-    private $y;
+    public $x;
+    public $y;
 
     /* Constructor: inicializa el punto con coordenadas x e y (tipo float) */
     public function __construct(float $x, float $y) {
