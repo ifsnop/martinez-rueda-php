@@ -75,28 +75,26 @@ final class StatusList
 
     public static function node(Node $data): Node
     {
-        //if (Algorithm::DEBUG) print __METHOD__ . PHP_EOL;
-        
         $data->previous = null;
         $data->next = null;
-        
+
         // Safe default remove (no-op if not inserted)
         $data->remove = function () use ($data) {
             if ($data->previous === null && $data->next === null) return;
-            
+
             $prev = $data->previous;
             $next = $data->next;
-            
+
             if ($prev !== null) $prev->next = $next;
             if ($next !== null) $next->previous = $prev;
-            
+
             $data->previous = null;
             $data->next = null;
         };
-        
+
         return $data;
     }
-    
+
     /* ================== Internal Helpers ================== */
     
     private function binSearchFirstTrue(callable $check): int

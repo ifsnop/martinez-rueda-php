@@ -167,7 +167,7 @@ class Intersecter {
 	return Point::pointAboveOrOnLine($a1, $b1, $b2) ? 1 : -1;
     }
 
-    private function statusFindSurrounding(StatusList $statusRoot, Node $ev): ?Transition {
+    private function statusFindSurrounding(StatusList $statusRoot, Node $ev): Transition {
         $checkFunc = static function(Node $here) use ($ev):bool {
             return self::statusCompare($ev, $here->ev) > 0;
         };
