@@ -15,11 +15,10 @@ final class GJTools
      * - Geometrías no poligonales (Point/LineString/etc.) se ignoran.
      *
      * @param string|array|object $geojsonSource Ruta a archivo .geojson, JSON en string o estructura ya decodificada.
-     * @param bool $enforceOrientation Si true, fuerza anillos exteriores CCW y huecos CW (recomendación RFC 7946).
      * @return array Array de polígonos: [ [ [ [x,y], ... ], [holeRing], ... ], ... ]
      * @throws InvalidArgumentException Si el JSON no es válido o el objeto no es GeoJSON válido.
     */
-    public static function geojsonToArray($geojsonSource, bool $enforceOrientation = false): array
+    public static function geojsonToArray($geojsonSource): array
     {
 	// 1) Cargar/decodificar
 	if (is_string($geojsonSource)) {
@@ -48,7 +47,7 @@ final class GJTools
 	}
 
 	// 2) Recorrer recursivamente y extraer polígonos
-	$polygons = self::extractPolygonsRec($root, $enforceOrientation);
+	$polygons = self::extractPolygonsRec($root);
 
 	// 3) Flatten
 	// necesitamos aplanar los rings para tenerlos todos seguidos
@@ -60,7 +59,7 @@ final class GJTools
 	// averiguar cuales son interior y cuales son exterior, teniendo en cuenta que
 	// los pares son exterior y los impares interior
 	$nodes = self::classifyRings($polygons);
-	$polygons = self::buildPolygons($nodes, $enforceOrientation=true);
+	$polygons = self::buildPolygons($nodes, $enforceOrientation = true);
 
 	// canonicalizePolygons 
         $tol = max(Algorithm::TOLERANCE, PHP_FLOAT_EPSILON);
@@ -74,7 +73,7 @@ final class GJTools
     /**
      * Función recursiva que extrae polígonos desde cualquier nodo GeoJSON.
      */
-    private static function extractPolygonsRec(array $node, bool $enforceOrientation): array
+    private static function extractPolygonsRec(array $node): array
     {
 	$out = [];
 
@@ -85,7 +84,7 @@ final class GJTools
 	// Caso raíz sin 'type' pero con 'features' (algunos exportadores)
 	if (!isset($node['type']) && isset($node['features']) && is_array($node['features'])) {
 	    foreach ($node['features'] as $feat) {
-		$out = array_merge($out, self::extractPolygonsRec($feat, $enforceOrientation));
+		$out = array_merge($out, self::extractPolygonsRec($feat));
 	    }
 	    return $out;
 	}
@@ -105,14 +104,14 @@ final class GJTools
 	    case 'FeatureCollection':
 		if (isset($node['features']) && is_array($node['features'])) {
 		    foreach ($node['features'] as $feature) {
-			$out = array_merge($out, self::extractPolygonsRec($feature, $enforceOrientation));
+			$out = array_merge($out, self::extractPolygonsRec($feature));
 		    }
 		}
 		break;
 	    case 'Feature':
 		// La geometría puede ser null
 		if (isset($node['geometry']) && is_array($node['geometry'])) {
-		    $out = array_merge($out, self::extractPolygonsRec($node['geometry'], $enforceOrientation));
+		    $out = array_merge($out, self::extractPolygonsRec($node['geometry']));
 		}
 		break;
 
@@ -120,7 +119,7 @@ final class GJTools
 		if (isset($node['geometries']) && is_array($node['geometries'])) {
 		    foreach ($node['geometries'] as $geom) {
 			if (is_array($geom)) {
-			    $out = array_merge($out, self::extractPolygonsRec($geom, $enforceOrientation));
+			    $out = array_merge($out, self::extractPolygonsRec($geom));
 			}
 		    }
 		}
@@ -128,7 +127,7 @@ final class GJTools
 
 	    case 'Polygon':
 		if (isset($node['coordinates']) && is_array($node['coordinates'])) {
-		    $poly = self::normalizePolygon($node['coordinates'], $enforceOrientation);
+		    $poly = self::normalizePolygon($node['coordinates']);
 		    if (!empty($poly)) {
 			$out[] = $poly;
 		    }
@@ -139,7 +138,7 @@ final class GJTools
 		if (isset($node['coordinates']) && is_array($node['coordinates'])) {
 		    foreach ($node['coordinates'] as $polyCoords) {
 			if (is_array($polyCoords)) {
-			    $poly = self::normalizePolygon($polyCoords, $enforceOrientation);
+			    $poly = self::normalizePolygon($polyCoords);
 			    if (!empty($poly)) {
 			        $out[] = $poly;
 			    }
@@ -164,13 +163,11 @@ final class GJTools
      * - Elimina el punto de cierre duplicado si existe (GeoJSON usa anillos cerrados).
      * - Descarta dimensiones extra (z/m) conservando [x,y].
      * - Filtra anillos degenerados (< 4 puntos) y coordenadas no numéricas.
-     * - Opcionalmente forza orientación: exterior CCW, huecos CW (RFC 7946).
      *
      * @param array $coords Estructura GeoJSON: [ ring0, ring1, ... ], ring = [ [x,y(,z...)], ... ]
-     * @param bool $enforceOrientation
      * @return array
      */
-    private static function normalizePolygon(array $coords/*, bool $enforceOrientation*/): array
+    private static function normalizePolygon(array $coords): array
     {
 	$rings = [];
 
@@ -196,23 +193,11 @@ final class GJTools
 		$ring[] = [floatval($x), floatval($y)];
 	    }
 
-	    /*
-	    // Eliminar punto de cierre duplicado si primero == último
-	    if (count($ring) >= 2) {
-		$first = $ring[0];
-		$last  = $ring[count($ring) - 1];
-		if ($first[0] === $last[0] && $first[1] === $last[1]) {
-		    array_pop($ring);
-		}
-	    }
-	    */
-
 	    // Un anillo válido necesita al menos 4 puntos en GeoJSON (incl. cierre).
 	    // Como removimos el cierre duplicado, exigimos >= 3 puntos distintos (triángulo).
 	    if (count($ring) < 3) {
 		// anillo degenerado → ignorar
 		throw new \InvalidArgumentException("Anillo degenerado count(ring)<3.");
-		continue;
 	    }
 
 
@@ -231,7 +216,7 @@ final class GJTools
 
     /**
      * Flattens a Multipolygon array so we can classify rings (exterior, interior, parent, child)
-     * @param array polygons
+     * @param array $polygons
      * @return array
      */
      private static function flattenMultipolygon(array $polygons): array
@@ -467,7 +452,7 @@ final class GJTools
      * Dada una cadena JSON que representa SOLO 'coordinates',
      * detecta si corresponde a un Polygon o a un MultiPolygon.
      *
-     * @param array $coordinatesJson Array JSON de coordinates (p.ej. [[[0,0],[1,0],[1,1],[0,1],[0,0]]] )
+     * @param array $coords Array JSON de coordinates (p.ej. [[[0,0],[1,0],[1,1],[0,1],[0,0]]] )
      * @return 'Polygon'|'MultiPolygon'
      * @throws InvalidArgumentException Si la cadena no es JSON válido o no tiene la estructura mínima.
      */
@@ -758,7 +743,7 @@ final class GJTools
      *   - Polygon: elegir uno
      *   - MultiPolygon (único): envolver esta lista una vez
      */
-    public static function buildPolygons(array $nodes, bool $enforceOrientation = false): array
+    public static function buildPolygons(array $nodes, bool $enforceOrientation): array
     {
         // familias (raíces)
         $roots = [];

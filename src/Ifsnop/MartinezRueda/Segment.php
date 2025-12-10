@@ -29,10 +29,10 @@ final class Segment {
     /** Recalcula min/max y longitud cuadrada */
     public function recalcBounds(): void
     {
-        $sx = $this->start->getX();
-        $sy = $this->start->getY();
-        $ex = $this->end->getX();
-        $ey = $this->end->getY();
+        $sx = $this->start->x;
+        $sy = $this->start->y;
+        $ex = $this->end->x;
+        $ey = $this->end->y;
 
         // AABB
         $this->minX = ($sx < $ex) ? $sx : $ex;
@@ -47,11 +47,11 @@ final class Segment {
     }
 
 
-    public function __toString() {
+    public function __toString():string {
 	return "S: {$this->start}, E: {$this->end}";
     }
 
-    public function __debugInfo() {
+    public function __debugInfo():array {
 	return ["start" => $this->start, "end" => $this->end, 'myFill' => $this->myFill, 'otherFill' => $this->otherFill];
     }
 }

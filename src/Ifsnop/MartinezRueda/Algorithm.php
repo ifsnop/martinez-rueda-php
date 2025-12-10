@@ -329,7 +329,7 @@ public static function segmentChainer(array $segments): array {
 		$combined = self::combine($firstSegments, $secondSegments);
 		$firstSegments = self::selectUnion($combined);
 	    }
-	    return polygon($firstSegments);
+	    return self::polygon($firstSegments);
 	} elseif (count($args) === 2 &&
 	    is_a($args[0], 'Ifsnop\MartinezRueda\Polygon') &&
 	    is_a($args[1], 'Ifsnop\MartinezRueda\Polygon')) {

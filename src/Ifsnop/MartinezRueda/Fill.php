@@ -21,12 +21,12 @@ final class Fill {
 
     // Método mágico __toString, se ejecuta cuando el objeto se usa como cadena.
     // Devuelve una cadena con los valores de above y below separados por coma.
-    public function __toString() {
+    public function __toString():string {
         return "{$this->above},{$this->below}";
     }
 
     // Método mágico __debugInfo, define cómo se mostrará el objeto al hacer un var_dump.
-    public function __debugInfo() {
+    public function __debugInfo():array {
         return ["below" => $this->below, "above" => $this->above];
     }
 }

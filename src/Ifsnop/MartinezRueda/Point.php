@@ -19,14 +19,6 @@ final class Point {
         return [$this->x, $this->y];
     }
 
-    public function getX(): float {
-	return $this->x;
-    }
-
-    public function getY(): float {
-	return $this->y;
-    }
-
     /*
      * Comprueba si tres puntos están alineados (colineales) usando determinante.
      * Se usa una tolerancia para evitar errores por precisión en números flotantes.

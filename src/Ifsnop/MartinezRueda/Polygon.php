@@ -57,29 +57,6 @@ final class Polygon {
 	//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 	return new self();
     }
-/*
-    public function fillFromArray(array $regions, bool $isInverted = false) {
-	//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-	print "depth: " . self::array_depth($regions) . PHP_EOL; exit(0);
-        $_regions = [];
-        foreach ($regions as $region) {
-            $tmp = [];
-            foreach ($region as $pt) {
-                if ($pt instanceof Point) {
-                    $tmp[] = $pt;
-                } elseif (is_array($pt) && count($pt) == 2) {
-                    list($x, $y) = $pt;
-                    $tmp[] = new Point($x, $y);
-                }
-            }
-            $_regions[] = $tmp;
-        }
-        $this->regions = array_merge($this->regions, $_regions);
-        $this->isInverted = $isInverted;
-        return $this;
-    }
-*/
-
 
     public function fillFromArray(array $regions, bool $isInverted = false)
     {

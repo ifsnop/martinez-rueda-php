@@ -22,59 +22,6 @@ class Intersecter {
         );
     }
 
-
-    // Criterio END antes que START en empates de p11
-    private function eventCompare(
-        bool $p1IsStart,
-        Point $p11,
-        Point $p12,
-        bool $p2IsStart,
-        Point $p21,
-        Point $p22
-    ):int {
-        $comp = Point::compare($p11, $p21);
-        if ( 0 !== $comp ) {
-            return $comp;
-        }
-
-        $comp = Point::compare($p12, $p22);
-        // if ($p12 == $p22) {
-	if ( 0 === $comp ) {
-            return 0;
-        }
-
-        if ($p1IsStart !== $p2IsStart) {
-	    // CAMBIO 4
-            return $p1IsStart ? 1 : -1; // CAMBIO
-            // return $p1IsStart ? -1 : 1; // ORIGINAL
-        }
-	if ( $p2IsStart ) {
-	    $lA = $p21;
-	    $lB = $p22;
-	} else {
-	    $lA = $p22;
-	    $lB = $p21;
-	}
-	//$lA = $p2IsStart ? $p21 : $p22;
-	//$lB = $p2IsStart ? $p22 : $p21;
-
-        return Point::pointAboveOrOnLine($p12, $lA, $lB) ? 1 : -1;
-    }
-
-/*
-    private function eventAdd(Node $ev, Point $otherPt):void {
-        $checkFunc = function(Node $here) use ($ev, $otherPt) {
-            $comp = $this->eventCompare(
-                $ev->isStart, $ev->pt, $otherPt, $here->isStart, $here->pt, $here->other->pt
-            );
-            return $comp < 0;
-        };
-
-        $this->eventRoot->insertBefore($ev, $checkFunc);
-    }
-*/
-
-
     private function eventAdd(Node $ev, Point $otherPt): void
     {
 	// Cachear valores de $ev que son invariantes durante la búsqueda
@@ -90,6 +37,7 @@ class Intersecter {
 	    $hIsStart = $here->isStart;
 
 	    // === Lógica inlined de eventCompare(...) ===
+	    // Criterio END antes que START en empates de p11
 	    // 1) Orden primario por $p11 vs $hPt
 	    $comp = Point::compare($p11, $hPt);
 	    if (0 !== $comp) {
@@ -159,12 +107,6 @@ class Intersecter {
     }
 
     public function eventAddSegment(Segment $segment, bool $primary): Node {
-        // $evStart = $this->eventAddSegmentStart($segment, $primary);
-        // $this->eventAddSegmentEnd($evStart, $segment, $primary);
-        // return $evStart;
-
-	// parche de copilot
-
 
 	if ($segment->start->__eq($segment->end)) {
 	    throw new PolyBoolException(
@@ -225,7 +167,7 @@ class Intersecter {
 	return Point::pointAboveOrOnLine($a1, $b1, $b2) ? 1 : -1;
     }
 
-    private function statusFindSurrounding(StatusList $statusRoot, Node $ev): ?Transition { // ?Node {
+    private function statusFindSurrounding(StatusList $statusRoot, Node $ev): ?Transition {
         $checkFunc = static function(Node $here) use ($ev):bool {
             return self::statusCompare($ev, $here->ev) > 0;
         };
