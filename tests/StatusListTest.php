@@ -15,7 +15,7 @@ use Ifsnop\MartinzRueda\Algorithm;
 class StatusListTest extends TestCase
 {
     private StatusList $statusList;
-    private $sizes = [100, 500, 1000, 2000, 5000, 10000];
+    private $sizes = [100, 500, 1000, 2000, 5000, 10000, 50000];
 
 
     protected function setUp(): void
@@ -499,7 +499,7 @@ class StatusListTest extends TestCase
     {
         $this->markTestSkipped('Enable manually for stress testing');
         
-        $size = 10000;
+        $size = 50000;
         $list = new StatusList();
         $nodes = [];
         
@@ -750,7 +750,7 @@ class StatusListTest extends TestCase
      */
     public function testExistsPerformance(): void
     {
-        $size = 1000;
+        $size = 5000;
         $list = new StatusList();
         $nodes = [];
         

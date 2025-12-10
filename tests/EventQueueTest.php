@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Ifsnop\MartinezRueda\Point;
 use Ifsnop\MartinezRueda\Segment;
 use Ifsnop\MartinezRueda\Node;
-use Ifsnop\MartinezRueda\LinkedList;
+use Ifsnop\MartinezRueda\StatusList;
 use Ifsnop\MartinezRueda\Algorithm;
 
 final class EventQueueTest extends TestCase
@@ -45,9 +45,9 @@ final class EventQueueTest extends TestCase
     }
 
     /**
-     * Inserta en LinkedList con la misma condición que usa Intersecter::eventAdd($ev, $otherPt).
+     * Inserta en StatusList con la misma condición que usa Intersecter::eventAdd($ev, $otherPt).
      */
-    private static function enqueue(LinkedList $q, Node $ev, Point $otherPt): void
+    private static function enqueue(StatusList $q, Node $ev, Point $otherPt): void
     {
         $check = function (Node $here) use ($ev, $otherPt): bool {
             $cmp = self::eventCompare(
@@ -60,7 +60,7 @@ final class EventQueueTest extends TestCase
     }
 
     /** Recolecta la cola en orden, devolviendo arreglo de nodos */
-    private static function dumpQueue(LinkedList $q): array
+    private static function dumpQueue(StatusList $q): array
     {
         $out = [];
         $cur = $q->getHead();
@@ -73,15 +73,15 @@ final class EventQueueTest extends TestCase
 
     public function testEndBeforeStartOnSamePoint(): void
     {
-        $q = new LinkedList();
+        $q = new StatusList();
 
         // Segmento A: start en (0,0), end en (1,0) → start event en (0,0)
         $aStart = new Point(0, 0);
         $aEnd   = new Point(1, 0);
         $segA   = new Segment($aStart, $aEnd);
 
-        $evAStart = LinkedList::node(new Node(isStart: true,  pt: $aStart, seg: $segA, primary: true));
-        $evAEnd   = LinkedList::node(new Node(isStart: false, pt: $aEnd,   seg: $segA, primary: true, other: $evAStart));
+        $evAStart = StatusList::node(new Node(isStart: true,  pt: $aStart, seg: $segA, primary: true));
+        $evAEnd   = StatusList::node(new Node(isStart: false, pt: $aEnd,   seg: $segA, primary: true, other: $evAStart));
         $evAStart->other = $evAEnd;
 
         // Segmento B: end en (0,0) (mismo punto), start en (-1,0) → end event en (0,0)
@@ -89,8 +89,8 @@ final class EventQueueTest extends TestCase
         $bEnd   = new Point( 0, 0);
         $segB   = new Segment($bStart, $bEnd);
 
-        $evBStart = LinkedList::node(new Node(isStart: true,  pt: $bStart, seg: $segB, primary: true));
-        $evBEnd   = LinkedList::node(new Node(isStart: false, pt: $bEnd,   seg: $segB, primary: true, other: $evBStart));
+        $evBStart = StatusList::node(new Node(isStart: true,  pt: $bStart, seg: $segB, primary: true));
+        $evBEnd   = StatusList::node(new Node(isStart: false, pt: $bEnd,   seg: $segB, primary: true, other: $evBStart));
         $evBStart->other = $evBEnd;
 
         // Encolamos primero el START de A y luego el END de B, mismo punto (0,0)
@@ -106,7 +106,7 @@ final class EventQueueTest extends TestCase
 
     public function testOrientationTieBreakForTwoStartsAtSamePoint(): void
     {
-        $q = new LinkedList();
+        $q = new StatusList();
 
         // Dos segmentos que empiezan en el mismo punto (0,0), direcciones distintas
         $p0 = new Point(0, 0);
@@ -114,12 +114,12 @@ final class EventQueueTest extends TestCase
         $s1 = new Segment($p0, new Point(1,  1)); // 45°
         $s2 = new Segment($p0, new Point(1, -1)); // -45°
 
-        $ev1 = LinkedList::node(new Node(isStart: true, pt: $p0, seg: $s1, primary: true));
-        $ev2 = LinkedList::node(new Node(isStart: true, pt: $p0, seg: $s2, primary: true));
+        $ev1 = StatusList::node(new Node(isStart: true, pt: $p0, seg: $s1, primary: true));
+        $ev2 = StatusList::node(new Node(isStart: true, pt: $p0, seg: $s2, primary: true));
 
         // "other" debe apuntar a su par (end); aquí creamos ends mínimos para cumplir el contrato:
-        $end1 = LinkedList::node(new Node(isStart: false, pt: $s1->end, seg: $s1, primary: true, other: $ev1));
-        $end2 = LinkedList::node(new Node(isStart: false, pt: $s2->end, seg: $s2, primary: true, other: $ev2));
+        $end1 = StatusList::node(new Node(isStart: false, pt: $s1->end, seg: $s1, primary: true, other: $ev1));
+        $end2 = StatusList::node(new Node(isStart: false, pt: $s2->end, seg: $s2, primary: true, other: $ev2));
         $ev1->other = $end1;
         $ev2->other = $end2;
 
@@ -146,15 +146,15 @@ final class EventQueueTest extends TestCase
 
     public function testReorderAfterEndMoved_simulatingEventUpdateEnd(): void
     {
-        $q = new LinkedList();
+        $q = new StatusList();
 
         // Segmento A: (0,0) -> (10,0)
         $a0 = new Point(0, 0);
         $a1 = new Point(10, 0);
         $segA = new Segment($a0, $a1);
 
-        $evAStart = LinkedList::node(new Node(isStart: true,  pt: $a0, seg: $segA, primary: true));
-        $evAEnd   = LinkedList::node(new Node(isStart: false, pt: $a1, seg: $segA, primary: true, other: $evAStart));
+        $evAStart = StatusList::node(new Node(isStart: true,  pt: $a0, seg: $segA, primary: true));
+        $evAEnd   = StatusList::node(new Node(isStart: false, pt: $a1, seg: $segA, primary: true, other: $evAStart));
         $evAStart->other = $evAEnd;
 
         // Segmento B: (2,0) -> (15,0)
@@ -162,8 +162,8 @@ final class EventQueueTest extends TestCase
         $b1 = new Point(15, 0);
         $segB = new Segment($b0, $b1);
 
-        $evBStart = LinkedList::node(new Node(isStart: true,  pt: $b0, seg: $segB, primary: true));
-        $evBEnd   = LinkedList::node(new Node(isStart: false, pt: $b1, seg: $segB, primary: true, other: $evBStart));
+        $evBStart = StatusList::node(new Node(isStart: true,  pt: $b0, seg: $segB, primary: true));
+        $evBEnd   = StatusList::node(new Node(isStart: false, pt: $b1, seg: $segB, primary: true, other: $evBStart));
         $evBStart->other = $evBEnd;
 
         // Encolar: starts y ends
@@ -197,7 +197,7 @@ final class EventQueueTest extends TestCase
 
     public function testSortedByXThenYBasic(): void
     {
-        $q = new LinkedList();
+        $q = new StatusList();
 
         // Tres eventos START en x ascendentes y/o y crecientes
         $p1 = new Point(0, 0);
@@ -208,14 +208,14 @@ final class EventQueueTest extends TestCase
         $s2 = new Segment($p2, new Point(2, 1));
         $s3 = new Segment($p3, new Point(2, 2));
 
-        $e1 = LinkedList::node(new Node(isStart: true, pt: $p1, seg: $s1, primary: true));
-        $e2 = LinkedList::node(new Node(isStart: true, pt: $p2, seg: $s2, primary: true));
-        $e3 = LinkedList::node(new Node(isStart: true, pt: $p3, seg: $s3, primary: true));
+        $e1 = StatusList::node(new Node(isStart: true, pt: $p1, seg: $s1, primary: true));
+        $e2 = StatusList::node(new Node(isStart: true, pt: $p2, seg: $s2, primary: true));
+        $e3 = StatusList::node(new Node(isStart: true, pt: $p3, seg: $s3, primary: true));
 
         // crear "other" mínimos (end) para cumplir contrato:
-        $e1->other = LinkedList::node(new Node(isStart: false, pt: $s1->end, seg: $s1, primary: true, other: $e1));
-        $e2->other = LinkedList::node(new Node(isStart: false, pt: $s2->end, seg: $s2, primary: true, other: $e2));
-        $e3->other = LinkedList::node(new Node(isStart: false, pt: $s3->end, seg: $s3, primary: true, other: $e3));
+        $e1->other = StatusList::node(new Node(isStart: false, pt: $s1->end, seg: $s1, primary: true, other: $e1));
+        $e2->other = StatusList::node(new Node(isStart: false, pt: $s2->end, seg: $s2, primary: true, other: $e2));
+        $e3->other = StatusList::node(new Node(isStart: false, pt: $s3->end, seg: $s3, primary: true, other: $e3));
 
         self::enqueue($q, $e3, $s3->end);
         self::enqueue($q, $e2, $s2->end);

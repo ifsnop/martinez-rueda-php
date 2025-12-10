@@ -12,9 +12,9 @@ use Ifsnop\MartinezRueda\Node;
  */
 class StatusListPerformanceTest extends TestCase
 {
-    private const SMALL_DATASET = 100;
-    private const MEDIUM_DATASET = 5000;
-    private const LARGE_DATASET = 20000;
+    private const SMALL_DATASET = 1000;
+    private const MEDIUM_DATASET = 10000;
+    private const LARGE_DATASET = 50000;
     
     /**
      * Test: Stress test with very large dataset
@@ -220,7 +220,7 @@ class StatusListPerformanceTest extends TestCase
     {
         gc_collect_cycles();
         
-        $sizes = [100, 500, 1000, 5000];
+        $sizes = [1000, 5000, 10000, 50000];
         
         echo "\n[MEMORY] Memory efficiency:\n";
         
