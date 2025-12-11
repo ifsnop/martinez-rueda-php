@@ -247,8 +247,8 @@ final class GJToolsTest extends TestCase
             ],
         ];
 
-        $outNo = GJTools::geojsonToArray($gj, false);
-        $outYes = GJTools::geojsonToArray($gj, true);
+        $outNo = GJTools::geojsonToArray($gj);
+        $outYes = GJTools::geojsonToArray($gj);
 
         // Sin enforcement, las orientaciones se mantienen
         $this->assertNotEmpty($outNo);

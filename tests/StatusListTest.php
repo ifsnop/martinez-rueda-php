@@ -576,7 +576,6 @@ class StatusListTest extends TestCase
                     array_splice($activeSegments, $idx, 1);
                     
                 } else {
-                    // Intersection event - find transitions (above/below)
                     if (count($activeSegments) > 0) {
                         $searchX = rand(0, 1000);
                         $transition = $statusList->findTransition(fn($n) => $n->pt['x'] > $searchX);
