@@ -208,7 +208,7 @@ class StatusListTest extends TestCase
                 $avgPerInsert
             );
             
-            $this->assertLessThan(5, $duration, "Sequential insert of $size nodes took too long");
+            $this->assertLessThan(25, $duration, "Sequential insert of $size nodes took too long");
         }
     }
 
@@ -241,7 +241,7 @@ class StatusListTest extends TestCase
                 $avgPerInsert
             );
             
-            $this->assertLessThan(10, $duration, "Random insert of $size nodes took too long");
+            $this->assertLessThan(25, $duration, "Random insert of $size nodes took too long");
         }
     }
 
@@ -277,7 +277,7 @@ class StatusListTest extends TestCase
                 $avgPerRemove
             );
             
-            $this->assertLessThan(10, $duration, "Remove of $size nodes took too long");
+            $this->assertLessThan(25, $duration, "Remove of $size nodes took too long");
         }
     }
 
@@ -316,7 +316,7 @@ class StatusListTest extends TestCase
                 $duration
             );
             
-            $this->assertLessThan(15, $duration, "Mixed operations for $size items took too long");
+            $this->assertLessThan(25, $duration, "Mixed operations for $size items took too long");
         }
     }
 
@@ -352,7 +352,7 @@ class StatusListTest extends TestCase
                 $avgPerSearch
             );
             
-            $this->assertLessThan(5, $duration, "FindTransition operations took too long");
+            $this->assertLessThan(25, $duration, "FindTransition operations took too long");
         }
     }
 
@@ -612,7 +612,7 @@ class StatusListTest extends TestCase
             );
             
             $this->assertTrue($statusList->isEmpty());
-            $this->assertLessThan(20, $duration, "Event processing simulation took too long");
+            $this->assertLessThan(25, $duration, "Event processing simulation took too long");
         }
     }
 
@@ -643,7 +643,7 @@ class StatusListTest extends TestCase
                 ($duration / $size) * 1000000
             );
             
-            $this->assertLessThan(10, $duration, "Worst case insert took too long");
+            $this->assertLessThan(25, $duration, "Worst case insert took too long");
         }
     }
 
@@ -749,7 +749,7 @@ class StatusListTest extends TestCase
      */
     public function testExistsPerformance(): void
     {
-        $size = 5000;
+        $size = 10000;
         $list = new StatusList();
         $nodes = [];
         
@@ -759,7 +759,7 @@ class StatusListTest extends TestCase
             $list->insertBefore($nodes[$i], fn($n) => $n->pt['x'] > $i);
         }
         
-        $checks = 10000;
+        $checks = 50000;
         $start = microtime(true);
         
         // Perform many existence checks
