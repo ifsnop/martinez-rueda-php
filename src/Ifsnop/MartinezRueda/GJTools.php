@@ -314,7 +314,8 @@ final class GJTools
             // Canonizar exterior y huecos
             $ext = self::ringCanonical($poly[0], $precision);
             $holes = [];
-            for ($i = 1; $i < count($poly); $i++) {
+	    $npoly = count($poly);
+            for ($i = 1; $i < $npoly; $i++) {
                 $holes[] = self::ringCanonical($poly[$i], $precision);
             }
 
@@ -386,7 +387,8 @@ final class GJTools
     private static function polygonKey(array $polygon, ?int $precision): string
     {
         $parts = [ self::ringKey($polygon[0], $precision) ];
-        for ($i = 1; $i < count($polygon); $i++) {
+	$npolygon = count($polygon);
+        for ($i = 1; $i < $npolygon; $i++) {
             $parts[] = self::ringKey($polygon[$i], $precision);
         }
         return implode('|', $parts);

@@ -58,7 +58,8 @@ public static function segmentChainer(array $segments): array {
 
         $segmentChainerMatcher = new SegmentChainerMatcher();
 
-        for ($i = 0; $i < count($chains); $i++) {
+	$nchains = count($chains);
+        for ($i = 0; $i < $nchains; $i++) {
             $chain = &$chains[$i];
             $head = $chain[0];
             $tail = end($chain);
@@ -324,7 +325,8 @@ public static function segmentChainer(array $segments): array {
 	if (count($args) === 1 && is_array($args[0])) {
 	    $polygons = $args[0];
 	    $firstSegments = self::segments($polygons[0]);
-	    for ($i = 1; $i < count($polygons); $i++) {
+	    $npolygons = count($polygons);
+	    for ($i = 1; $i < $npolygons; $i++) {
 		$secondSegments = self::segments($polygons[$i]);
 		$combined = self::combine($firstSegments, $secondSegments);
 		$firstSegments = self::selectUnion($combined);
