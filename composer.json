@@ -1,5 +1,6 @@
 {
     "name": "ifsnop/martinez-rueda",
+    "description" : "Robust and tested library for boolean operations on polygons (union, intersection, difference, xor)",
     "autoload": {
         "psr-4": {
             "Ifsnop\\MartinezRueda\\": "src/Ifsnop/MartinezRueda/"
@@ -14,5 +15,7 @@
         "phpunit/phpunit": "^10.0",
         "phpstan/phpstan": "^2.1",
         "shipmonk/dead-code-detector": "^0.14.0"
-    }
+    },
+    "license": "GPL-3.0-or-later"
+
 }

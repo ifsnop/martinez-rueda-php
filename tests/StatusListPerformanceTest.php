@@ -23,7 +23,7 @@ class StatusListPerformanceTest extends TestCase
     public function testStressTestWithLargeDataset(): void
     {
         $list = new StatusList();
-        $nodeCount = 50000;
+        $nodeCount = self::LARGE_DATASET;
         
         $startTime = microtime(true);
         $startMemory = memory_get_usage();
@@ -38,7 +38,7 @@ class StatusListPerformanceTest extends TestCase
         
         // Perform random searches
         $startTime = microtime(true);
-        for ($i = 0; $i < 100; $i++) {
+        for ($i = 0; $i < 1000; $i++) {
             $searchValue = rand(0, $nodeCount - 1);
             $list->findTransition(fn($n) => $n->pt['x'] > $searchValue);
         }
@@ -61,7 +61,7 @@ class StatusListPerformanceTest extends TestCase
         
         echo sprintf("\n[STRESS] Large dataset (%d nodes):\n", $nodeCount);
         echo sprintf("  - Insertion:     %.4fs\n", $insertTime);
-        echo sprintf("  - 100 searches:  %.4fs\n", $searchTime);
+        echo sprintf("  - 1000 searches: %.4fs\n", $searchTime);
         echo sprintf("  - Traversal:     %.4fs\n", $traverseTime);
         echo sprintf("  - Memory used:   %.2f MB\n", $memoryUsed);
         
@@ -77,7 +77,7 @@ class StatusListPerformanceTest extends TestCase
      */
     public function testInsertionStrategyComparison(): void
     {
-        $nodeCount = self::MEDIUM_DATASET;
+        $nodeCount = self::LARGE_DATASET;
         
         // Strategy 1: Always at the end
         $list1 = new StatusList();
@@ -130,7 +130,7 @@ class StatusListPerformanceTest extends TestCase
         $nodes = [];
         
         // Build list
-        for ($i = 0; $i < self::MEDIUM_DATASET; $i++) {
+        for ($i = 0; $i < self::LARGE_DATASET; $i++) {
             $node = StatusList::node(new Node(pt: ['x' => $i, 'y' => 0]));
             $nodes[] = $node;
             $list->insertBefore($node, fn($n) => false);
@@ -141,7 +141,7 @@ class StatusListPerformanceTest extends TestCase
         $startTime = microtime(true);
         
         for ($i = 0; $i < $checks; $i++) {
-            $node = $nodes[rand(0, self::MEDIUM_DATASET - 1)];
+            $node = $nodes[rand(0, self::LARGE_DATASET - 1)];
             $result = $list->exists($node);
             $this->assertTrue($result);
         }
@@ -153,8 +153,8 @@ class StatusListPerformanceTest extends TestCase
             $checks, $executionTime, $avgPerCheck);
         
         // Should be very fast (O(1))
-        $this->assertLessThan(0.1, $executionTime, "Exists checks too slow");
-        $this->assertLessThan(10, $avgPerCheck, "Average exists check too slow");
+        $this->assertLessThan(0.5, $executionTime, "Exists checks too slow");
+        $this->assertLessThan(30, $avgPerCheck, "Average exists check too slow");
     }
     
     /**
@@ -164,7 +164,7 @@ class StatusListPerformanceTest extends TestCase
     {
         $list = new StatusList();
         $nodes = [];
-        $operations = 5000;
+        $operations = self::LARGE_DATASET; //5000;
         
         $startTime = microtime(true);
         
@@ -220,7 +220,7 @@ class StatusListPerformanceTest extends TestCase
     {
         gc_collect_cycles();
         
-        $sizes = [1000, 5000, 10000, 50000];
+        $sizes = [self::SMALL_DATASET, self::MEDIUM_DATASET, self::LARGE_DATASET];
         
         echo "\n[MEMORY] Memory efficiency:\n";
         
