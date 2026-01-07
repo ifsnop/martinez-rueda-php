@@ -164,25 +164,31 @@ exit(0);
 // el algoritmo devuelve o bien polígonos o bien listas de polígonos, dependiendo
 // del resultado de la operación.
 
-
-// $mp = MR\GJTools::geojsonToArray("tests/continents_australia.json");
-// $pa = MR\Polygon::create()->fillFromArray($mp);
-// $mp_normalized = MR\GJTools::geojsonToArray($mp);
-
-// $shifted_mp = displaceMultiPolygon($mp, -0.5);
+print "xoring australia with shifted australia...";
+$australia = MR\GJTools::geojsonToArray("tests/continents_australia.json");
+$polygon_australia = MR\Polygon::create()->fillFromArray($australia);
+//$mp_normalized = MR\GJTools::geojsonToArray($mp);
+$shifted_australia = displaceMultiPolygon($australia, -0.5);
 // print json_encode($shifted_mp) . PHP_EOL; exit(1);
-
-
-// $shifted_pa = MR\Polygon::create()->fillFromArray($shifted_mp);
+$shifted_polygon_australia = MR\Polygon::create()->fillFromArray($shifted_australia);
 
 #print "original #" . $pa->numPoints . PHP_EOL;
 #print "displaced #" . $shifted_pa->numPoints . PHP_EOL;
 
-// $result = MR\Algorithm::xoring($pa, $shifted_pa); // devuelve un class Polygon
+$result = MR\Algorithm::xoring($polygon_australia, $shifted_polygon_australia); // devuelve un class Polygon
 // $result_normalized = MR\GJTools::geojsonToArray($result->getArray()); // devuelve un array
 // print json_encode($result_normalized) . PHP_EOL;
 // exit(1);
-// print "result #" . $result->numPoints . PHP_EOL;
+if ($result->numPoints == 1340) print "PASS" . PHP_EOL; else print "FAIL(" . $result->numPoints . ")" . PHP_EOL;
+
+print "xoring europe with shifted europe...";
+$europe = MR\GJTools::geojsonToArray("tests/continents_europe.json");
+$polygon_europe = MR\Polygon::create()->fillFromArray($europe);
+$shifted_europe = displaceMultiPolygon($europe, -0.5);
+$shifted_polygon_europe = MR\Polygon::create()->fillFromArray($shifted_europe);
+$result = MR\Algorithm::xoring($polygon_europe, $shifted_polygon_europe);
+if ($result->numPoints == 9178) print "PASS" . PHP_EOL; else print "FAIL(" . $result->numPoints . ")" . PHP_EOL;
+
 /*
 $result_normalized = MR\GJTools::geojsonToArray($result->getArray()); // devuelve un array
 
