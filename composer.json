@@ -1,5 +1,5 @@
 {
-    "name": "ifsnop/martinez-rueda",
+    "name": "ifsnop/martinez-rueda-php",
     "description" : "Robust and tested library for boolean operations on polygons (union, intersection, difference, xor)",
     "autoload": {
         "psr-4": {
