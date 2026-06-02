@@ -4,12 +4,12 @@ declare(strict_types=1);
 namespace Ifsnop\MartinezRueda;
 
 class Intersecter {
-    private $selfIntersection;
-    private $eventRoot;
+    private bool $selfIntersection;
+    private EventList $eventRoot;
 
     public function __construct(bool $selfIntersection) {
         $this->selfIntersection = $selfIntersection;
-        $this->eventRoot = new StatusList();
+        $this->eventRoot = new EventList();
     }
 
     public function newSegment(Point $start, Point $end): Segment {
@@ -24,55 +24,7 @@ class Intersecter {
 
     private function eventAdd(Node $ev, Point $otherPt): void
     {
-	// Cachear valores de $ev que son invariantes durante la búsqueda
-	$p1IsStart = $ev->isStart;
-	$p11       = $ev->pt;       // punto de este evento
-	$p12       = $otherPt;      // el otro punto de su segmento
-
-	// Closure estática: no captura $this
-	$checkFunc = static function (Node $here) use ($p1IsStart, $p11, $p12): bool {
-	    // Cachear propiedades de $here para reducir accesos repetidos
-	    $hPt      = $here->pt;
-	    $hOtherPt = $here->other->pt;
-	    $hIsStart = $here->isStart;
-
-	    // === Lógica inlined de eventCompare(...) ===
-	    // Criterio END antes que START en empates de p11
-	    // 1) Orden primario por $p11 vs $hPt
-	    $comp = Point::compare($p11, $hPt);
-	    if (0 !== $comp) {
-		return $comp < 0;
-	    }
-
-	    // 2) Si el otro extremo es igual, son el mismo evento → comp=0 → no insertar antes
-	    $comp = Point::compare($p12, $hOtherPt);
-	    if (0 === $comp) {
-		return false; // equivale a (comp < 0) cuando comp == 0
-	    }
-
-	    // 3) Si uno es start y el otro end, la prioridad la da isStart
-	    if ($p1IsStart !== $hIsStart) {
-		// eventCompare devolvería (p1IsStart ? 1 : -1)
-		// y nosotros devolvemos (comp < 0)
-		return !$p1IsStart; // true si p1 es end (comp = -1)
-	    }
-
-	    // 4) Geométrico: por encima de la línea => +1; si no => -1
-	    // Queremos comp < 0, o sea, NOT "pointAboveOrOnLine"
-	    if ( $hIsStart ) {
-		$lineA = $hPt;
-		$lineB = $hOtherPt;
-	    } else {
-		$lineA = $hOtherPt;
-		$lineB = $hPt;
-	    }
-	    //$lineA = $hIsStart ? $hPt : $hOtherPt;
-	    //$lineB = $hIsStart ? $hOtherPt : $hPt;
-
-	    return !Point::pointAboveOrOnLine($p12, $lineA, $lineB);
-	};
-
-	$this->eventRoot->insertBefore($ev, $checkFunc);
+	$this->eventRoot->insertBefore($ev, $otherPt);
     }
 
 
@@ -153,25 +105,8 @@ class Intersecter {
         return $this->eventAddSegment($ns, $ev->primary);
     }
 
-    private static function statusCompare(Node $ev1, Node $ev2): int {
-        $a1 = $ev1->seg->start; $a2 = $ev1->seg->end;
-        $b1 = $ev2->seg->start; $b2 = $ev2->seg->end;
-
-	if ( Point::collinear($a1, $b1, $b2) ) {
-	    if ( Point::collinear($a2, $b1, $b2) ) {
-		// Igualdad geométrica: 0 o desempate estable
-		return 0;
-	    }
-	    return Point::pointAboveOrOnLine($a2, $b1, $b2) ? 1 : -1;
-	}
-	return Point::pointAboveOrOnLine($a1, $b1, $b2) ? 1 : -1;
-    }
-
     private function statusFindSurrounding(StatusList $statusRoot, Node $ev): Transition {
-        $checkFunc = static function(Node $here) use ($ev):bool {
-            return self::statusCompare($ev, $here->ev) > 0;
-        };
-        return $statusRoot->findTransition($checkFunc);
+	return $statusRoot->findTransition($ev);
     }
 
     // Nota: -2/+2 significan que la proyección cae fuera del segmento lejos del extremo.
