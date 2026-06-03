@@ -27,7 +27,6 @@ class Intersecter {
 	$this->eventRoot->insertBefore($ev, $otherPt);
     }
 
-/*
     private function eventAddSegmentStart(Segment $segment, bool $primary): Node {
         $evStart = StatusList::node(
             new Node(
@@ -58,36 +57,29 @@ class Intersecter {
 	//Debug::log("ADD END  : %s (primary=%s)", Debug::evStr($evEnd), $primary ? 'Y' : 'N'); Debug::dumpEventQueue($this->eventRoot);
     }
 
-*/
-public function eventAddSegment(Segment $segment, bool $primary): Node {
-    // 1 Comparación única, swap in-place sin variable temporal
-    if (Point::compare($segment->start, $segment->end) > 0) {
-        [$segment->start, $segment->end] = [$segment->end, $segment->start];
+    public function eventAddSegment(Segment $segment, bool $primary): Node {
+
+    if ($segment->start->__eq($segment->end)) {
+        throw new PolyBoolException(
+	"PolyBool: Zero-length segment detected; check input or adjust Algorithm::TOLERANCE"
+        );
     }
 
-    // 2 Inlining de eventAddSegmentStart (evita un frame de pila)
-    $evStart = new Node(
-        isStart: true,
-        pt:      $segment->start,
-        seg:     $segment,
-        primary: $primary,
-    );
-    // NO crear el closure placeholder de StatusList::node() aquí
-    $this->eventRoot->insertBefore($evStart, $segment->end);
 
-    // 3 Inlining de eventAddSegmentEnd
-    $evEnd = new Node(
-        isStart: false,
-        pt:      $segment->end,
-        seg:     $segment,
-        primary: $primary,
-        other:   $evStart,
-    );
-    $evStart->other = $evEnd;
-    $this->eventRoot->insertBefore($evEnd, $segment->start);
+    // Si has procesado un evento de final (END) antes de que su evento de inicio (START)
+    //  hubiera sido insertado en la StatusList, por lo que $ev->status === null y lanza esa excepción.
+    // Zero-length segment detected.
+    // Normaliza el sentido del segmento: START = extremo "izquierdo" (o menor lexicográfico)
+    if (Point::compare($segment->start, $segment->end) > 0) {
+        $tmp = $segment->start;
+        $segment->start = $segment->end;
+        $segment->end = $tmp;
+    }
 
+    $evStart = $this->eventAddSegmentStart($segment, $primary);
+    $this->eventAddSegmentEnd($evStart, $segment, $primary);
     return $evStart;
-}
+    }
 
     private function eventUpdateEnd(Node $ev, Point $end): void {
         //call_user_func($ev->other->remove);
