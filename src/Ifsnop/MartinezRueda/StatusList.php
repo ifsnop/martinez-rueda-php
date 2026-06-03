@@ -1,108 +1,114 @@
 <?php
 declare(strict_types=1);
+
 namespace Ifsnop\MartinezRueda;
 
+/* ===========================================================================
+ *  StatusList  ->  estado del barrido (skip list ordenado con vecinos)
+ * ========================================================================= */
 final class StatusList
 {
-    /** @var Node[] */
-    private array $arr    = [];
-    /** @var array<int,true> */
-    private array $exists = [];
-    private Node  $root;
+    use SkipListCore;
 
-    public function __construct() { $this->root = new Node(isRoot: true); }
+    /** @var array<int,true> set de membresía para exists() */
+    private array $exists = [];
+
+    public function __construct() { $this->initSkip(); }
 
     public function exists(?Node $node): bool
     {
-        if ($node === null || $node === $this->root) return false;
+        if ($node === null) {
+            return false;
+        }
         return isset($this->exists[\spl_object_id($node)]);
     }
 
+    /**
+     * Inicializa un Node como elemento de lista. El `remove` que se fija aquí
+     * es un marcador de posición: lo sustituye la lista concreta (EventList o
+     * StatusList) en el momento de insertarlo de verdad.
+     */
     public static function node(Node $data): Node
     {
         $data->previous = null;
         $data->next     = null;
         $data->remove   = static function () use ($data) {
-            if ($data->previous === null && $data->next === null) return;
+            if ($data->previous === null && $data->next === null) {
+                return;
+            }
             $prev = $data->previous;
             $next = $data->next;
-            if ($prev !== null) $prev->next = $next;
+            if ($prev !== null) $prev->next     = $next;
             if ($next !== null) $next->previous = $prev;
             $data->previous = $data->next = null;
         };
         return $data;
     }
 
+    /**
+     * Localiza la posición de $ev y devuelve sus vecinos (before/after) más
+     * un closure `insert` que realiza la inserción real (re-buscando, porque
+     * el segmento de $ev puede haber sido dividido entre medias). Equivalente
+     * al comportamiento original, ahora en O(log n).
+     */
     public function findTransition(Node $ev): Transition
     {
-        $pos    = $this->binSearchPos($ev);
-        $count  = \count($this->arr);
-        $before = $pos > 0      ? $this->arr[$pos - 1] : null;
-        $after  = $pos < $count ? $this->arr[$pos]     : null;
+        $update  = $this->searchStatus($ev);
+        $beforeW = $update[0];
+        $afterW  = $beforeW->next[0];
+
+        $before = ($beforeW === $this->header) ? null : $beforeW->value;
+        $after  = ($afterW  === null)          ? null : $afterW->value;
 
         $insert = function (Node $node) use ($ev): Node {
-            $this->arrayInsertAt($this->binSearchPos($ev), $node);
-            $node->remove = function () use ($node) { $this->arrayRemove($node); };
+            $update = $this->searchStatus($ev);
+            $w      = $this->linkAt($update, $node);
+            $this->exists[\spl_object_id($node)] = true;
+            $node->remove = function () use ($node, $w) {
+                $this->unlink($w);
+                unset($this->exists[\spl_object_id($node)]);
+            };
             return $node;
         };
 
         return new Transition(after: $after, before: $before, insert: $insert);
     }
 
-    /** Primer índice donde statusCompare($ev, arr[i]->ev) > 0 (inlinado). */
-    private function binSearchPos(Node $ev): int
+    /**
+     * Camino de predecesores para la posición vertical de $ev en el estado.
+     *
+     * @return array<int,SkipNode>
+     */
+    private function searchStatus(Node $ev): array
     {
-        $lo = 0;
-        $hi = \count($this->arr);
+        $update = [];
         $a1 = $ev->seg->start;
         $a2 = $ev->seg->end;
 
-        while ($lo < $hi) {
-            $mid = ($lo + $hi) >> 1;
-            $e2  = $this->arr[$mid]->ev;
-            $b1  = $e2->seg->start;
-            $b2  = $e2->seg->end;
-
-            if (Point::collinear($a1, $b1, $b2)) {
-                $check = !Point::collinear($a2, $b1, $b2) && Point::pointAboveOrOnLine($a2, $b1, $b2);
-            } else {
-                $check = Point::pointAboveOrOnLine($a1, $b1, $b2);
+        $x = $this->header;
+        for ($i = $this->level - 1; $i >= 0; $i--) {
+            $n = $x->next[$i];
+            while ($n !== null && !$this->statusCheckBefore($a1, $a2, $n->value->ev)) {
+                $x = $n;
+                $n = $x->next[$i];
             }
-
-            if ($check) { $hi = $mid; } else { $lo = $mid + 1; }
+            $update[$i] = $x;
         }
-
-        return $lo;
+        return $update;
     }
 
-    private function arrayInsertAt(int $pos, Node $node): void
+    /**
+     * Comparador idéntico al binSearchPos original:
+     * true si $ev (a1,a2) debe situarse ANTES del evento existente $e2.
+     */
+    private function statusCheckBefore(Point $a1, Point $a2, Node $e2): bool
     {
-        \array_splice($this->arr, $pos, 0, [$node]);
-        $this->exists[\spl_object_id($node)] = true;
-        $count = \count($this->arr);
-        $prev  = $pos > 0          ? $this->arr[$pos - 1] : $this->root;
-        $next  = $pos + 1 < $count ? $this->arr[$pos + 1] : null;
-        $node->previous = $prev;
-        $node->next     = $next;
-        $prev->next     = $node;
-        if ($next !== null) $next->previous = $node;
-    }
+        $b1 = $e2->seg->start;
+        $b2 = $e2->seg->end;
 
-    private function arrayRemove(Node $node): void
-    {
-        $oid = \spl_object_id($node);
-        if (!isset($this->exists[$oid])) return;
-        $count = \count($this->arr);
-        for ($i = 0; $i < $count; $i++) {
-            if ($this->arr[$i] !== $node) continue;
-            $prev = $i > 0          ? $this->arr[$i - 1] : $this->root;
-            $next = $i + 1 < $count ? $this->arr[$i + 1] : null;
-            $prev->next = $next;
-            if ($next !== null) $next->previous = $prev;
-            \array_splice($this->arr, $i, 1);
-            unset($this->exists[$oid]);
-            $node->previous = $node->next = null;
-            return;
+        if (Point::collinear($a1, $b1, $b2)) {
+            return !Point::collinear($a2, $b1, $b2) && Point::pointAboveOrOnLine($a2, $b1, $b2);
         }
+        return Point::pointAboveOrOnLine($a1, $b1, $b2);
     }
 }

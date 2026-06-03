@@ -1,83 +1,179 @@
 <?php
 declare(strict_types=1);
+
 namespace Ifsnop\MartinezRueda;
 
+/* ===========================================================================
+ *  Intersecter — versión optimizada (sweep-line / Bentley–Ottmann)
+ * ===========================================================================
+ *
+ *  ANÁLISIS DEL PATRÓN DE ACCESO
+ *  -----------------------------
+ *  `Intersecter` accede millones de veces a dos listas que son las dos
+ *  estructuras clásicas de un barrido de líneas:
+ *
+ *    EventList  -> COLA DE PRIORIDAD de eventos:
+ *                  · extraer mínimo            (getHead)
+ *                  · insertar ordenado         (insertBefore)
+ *                  · borrar nodo arbitrario    (remove, al dividir/fusionar)
+ *
+ *    StatusList -> ESTADO DEL BARRIDO (orden vertical):
+ *                  · buscar posición + vecinos (findTransition -> before/after)
+ *                  · insertar ordenado         (insert)
+ *                  · borrar nodo arbitrario    (remove)
+ *                  · recorrer vecinos          (prev / next)
+ *
+ *  PROBLEMA DE LA IMPLEMENTACIÓN ANTERIOR
+ *  --------------------------------------
+ *  Ambas usaban `array` ordenado + `array_splice`:
+ *    · La búsqueda binaria era O(log n)...
+ *    · ...pero CADA inserción y CADA borrado hacían `array_splice` = O(n)
+ *      (desplaza todos los elementos siguientes).
+ *    · `arrayRemove` además recorría el array linealmente = O(n) extra.
+ *  Resultado: O(n) por operación  ->  O(n^2) global sobre el camino crítico.
+ *
+ *  ESTRUCTURA ELEGIDA: SKIP LIST CON TODOS LOS NIVELES DOBLEMENTE ENLAZADOS
+ *  -----------------------------------------------------------------------
+ *  El patrón (extraer-mínimo + insertar-ordenado + borrar-por-nodo + vecinos)
+ *  pide un CONJUNTO ORDENADO BALANCEADO. Un skip list es óptimo aquí porque:
+ *
+ *    1. Búsqueda / inserción / borrado en O(log n) esperado.
+ *    2. El NIVEL 0 es ya una lista doblemente enlazada -> getHead, isEmpty,
+ *       prev y next son O(1) y CONSERVAN la interfaz de punteros que el
+ *       algoritmo ya usa ($st->previous, $st->next, $cursor->next, getHead).
+ *       => No hay que reescribir la navegación del barrido.
+ *    3. Borrado por NODO sin buscar: como cada nivel está doblemente
+ *       enlazado, se desenlaza en O(altura) y se elimina la búsqueda
+ *       lineal O(n) que penalizaba la versión con array.
+ *
+ *  (Un BST balanceado —AVL/rojo-negro con hilos in-order— da la misma
+ *   complejidad, pero obligaría a reescribir la navegación de vecinos; el
+ *   skip list encaja con el código existente sin tocarlo.)
+ *
+ *  El orden de inserción usa EXACTAMENTE los mismos comparadores que la
+ *  versión con búsqueda binaria (misma semántica de orden y mismos
+ *  desempates: inserción detrás de los elementos "iguales"), por lo que la
+ *  salida debe coincidir SIEMPRE QUE el comparador defina un orden consistente
+ *  sobre el conjunto activo — exactamente la misma hipótesis que ya requería la
+ *  búsqueda binaria original (predicado monótono), así que no se añade riesgo.
+ *  Sólo cambia la complejidad temporal. El borrado es por IDENTIDAD de objeto,
+ *  así que no depende de claves iguales/empates.
+ *
+ *  GANANCIA ESPERADA (verificar con benchmark real)
+ *  ------------------------------------------------
+ *  La mejora asintótica O(n)->O(log n) es real y la ganancia DOMINANTE está en
+ *  la EventList: con problemas grandes, 5M operaciones x O(n) de `array_splice`
+ *  es catastrófico. En la StatusList el conjunto activo suele ser pequeño, y un
+ *  skip list en userland PHP tiene constantes altas (arrays next/prev por nodo,
+ *  un closure por inserción) frente al `memmove` en C de `array_splice`; por
+ *  tanto la ventaja ahí no está garantizada y conviene CONFIRMARLA con un
+ *  benchmark sobre datos representativos antes de darla por hecha.
+ *
+ *  OTRAS OPTIMIZACIONES APLICADAS / RECOMENDADAS
+ *  ---------------------------------------------
+ *    · Rechazo temprano por AABB cacheada en checkIntersection (ya presente,
+ *      se conserva): evita el cálculo de intersección caro entre cajas que no
+ *      se solapan.
+ *    · getHead() / isEmpty() en O(1) (cabeza del nivel 0).
+ *    · Borrado por nodo en O(log n) sin búsqueda lineal.
+ *    · Se elimina el `array_splice` y el coste de recolocar el array entero.
+ *    · `spl_object_id` sólo se usa en StatusList::exists() (set de membresía);
+ *      el resto del trabajo es por referencia directa a objetos.
+ *    · Recomendado en producción: activar OPcache + JIT
+ *        opcache.enable=1
+ *        opcache.jit=tracing
+ *        opcache.jit_buffer_size=128M
+ *      El JIT acelera mucho los bucles de comparación geométrica.
+ *
+ *  IMPORTANTE: la API pública de EventList y StatusList se mantiene, por lo que
+ *  `Intersecter` NO requiere cambios (sus firmas y sus llamadas son idénticas).
+ *
+ *  DEPENDENCIAS EXTERNAS (definidas en otro punto del proyecto, no en este
+ *  fichero): Point, Node, Segment, Fill, Transition, PolyBoolException, Algorithm.
+ *
+ *  ¡¡AVISO!! Este fichero NO ha podido ejecutarse en el entorno donde se generó
+ *  (sin intérprete PHP disponible). Es un rewrite con punteros sobre el camino
+ *  crítico: VALÍDALO contra tu suite existente y/o con el test estructural
+ *  adjunto (skiplist_test.php) antes de ponerlo en producción.
+ * ===========================================================================
+ */
+
+/* ===========================================================================
+ *  EventList  ->  cola de prioridad de eventos (skip list ordenado)
+ * ========================================================================= */
 final class EventList
 {
-    /** @var Node[] */
-    private array $arr    = [];
-    /** @var array<int,true> */
-    private array $exists = [];
-    private Node  $root;
+    use SkipListCore;
 
-    public function __construct() { $this->root = new Node(isRoot: true); }
+    public function __construct() { $this->initSkip(); }
 
-    public function isEmpty(): bool  { return \count($this->arr) === 0; }
-    public function getHead(): ?Node { return $this->arr[0] ?? null;    }
+    public function isEmpty(): bool
+    {
+        return $this->header->next[0] === null;
+    }
 
+    public function getHead(): ?Node
+    {
+        $n = $this->header->next[0];
+        return $n === null ? null : $n->value;
+    }
+
+    /**
+     * Inserta $ev manteniendo el MISMO orden que la versión con búsqueda
+     * binaria. $otherPt es el otro extremo del evento (puede que $ev->other
+     * aún no esté fijado en el momento de insertar el START).
+     */
     public function insertBefore(Node $ev, Point $otherPt): void
     {
-        $lo        = 0;
-        $hi        = \count($this->arr);
-        $p1IsStart = $ev->isStart;
-        $p11       = $ev->pt;
-        $p12       = $otherPt;
+        $update = $this->searchEvent($ev->pt, $otherPt, $ev->isStart);
+        $w      = $this->linkAt($update, $ev);
+        $ev->remove = function () use ($w) { $this->unlink($w); };
+    }
 
-        while ($lo < $hi) {
-            $mid      = ($lo + $hi) >> 1;
-            $here     = $this->arr[$mid];
-            $hPt      = $here->pt;
-            $hOtherPt = $here->other->pt;
-            $hIsStart = $here->isStart;
-
-            $comp = Point::compare($p11, $hPt);
-            if ($comp !== 0) {
-                $check = $comp < 0;
-            } elseif (0 === Point::compare($p12, $hOtherPt)) {
-                $check = false;
-            } elseif ($p1IsStart !== $hIsStart) {
-                $check = !$p1IsStart;
-            } else {
-                $lineA = $hIsStart ? $hPt : $hOtherPt;
-                $lineB = $hIsStart ? $hOtherPt : $hPt;
-                $check = !Point::pointAboveOrOnLine($p12, $lineA, $lineB);
+    /**
+     * Camino de predecesores para la posición de inserción.
+     * Avanza mientras el nodo existente NO deba ir detrás del insertado
+     * (es decir, mientras el existente precede al insertado).
+     *
+     * @return array<int,SkipNode>
+     */
+    private function searchEvent(Point $p11, Point $p12, bool $p1IsStart): array
+    {
+        $update = [];
+        $x = $this->header;
+        for ($i = $this->level - 1; $i >= 0; $i--) {
+            $n = $x->next[$i];
+            while ($n !== null && !$this->eventCheckBefore($p11, $p12, $p1IsStart, $n->value)) {
+                $x = $n;
+                $n = $x->next[$i];
             }
-
-            if ($check) { $hi = $mid; } else { $lo = $mid + 1; }
+            $update[$i] = $x;
         }
-
-        $this->arrayInsertAt($lo, $ev);
-        $ev->remove = function () use ($ev) { $this->arrayRemove($ev); };
+        return $update;
     }
 
-    private function arrayInsertAt(int $pos, Node $node): void
+    /**
+     * Comparador idéntico al de la versión con búsqueda binaria:
+     * devuelve true si el evento insertado debe situarse ANTES de $here.
+     */
+    private function eventCheckBefore(Point $p11, Point $p12, bool $p1IsStart, Node $here): bool
     {
-        \array_splice($this->arr, $pos, 0, [$node]);
-        $this->exists[\spl_object_id($node)] = true;
-        $count = \count($this->arr);
-        $prev  = $pos > 0          ? $this->arr[$pos - 1] : $this->root;
-        $next  = $pos + 1 < $count ? $this->arr[$pos + 1] : null;
-        $node->previous = $prev;
-        $node->next     = $next;
-        $prev->next     = $node;
-        if ($next !== null) $next->previous = $node;
-    }
+        $hPt      = $here->pt;
+        $hOtherPt = $here->other->pt;
+        $hIsStart = $here->isStart;
 
-    private function arrayRemove(Node $node): void
-    {
-        $oid = \spl_object_id($node);
-        if (!isset($this->exists[$oid])) return;
-        $count = \count($this->arr);
-        for ($i = 0; $i < $count; $i++) {
-            if ($this->arr[$i] !== $node) continue;
-            $prev = $i > 0          ? $this->arr[$i - 1] : $this->root;
-            $next = $i + 1 < $count ? $this->arr[$i + 1] : null;
-            $prev->next = $next;
-            if ($next !== null) $next->previous = $prev;
-            \array_splice($this->arr, $i, 1);
-            unset($this->exists[$oid]);
-            $node->previous = $node->next = null;
-            return;
+        $comp = Point::compare($p11, $hPt);
+        if ($comp !== 0) {
+            return $comp < 0;
         }
+        if (Point::compare($p12, $hOtherPt) === 0) {
+            return false;
+        }
+        if ($p1IsStart !== $hIsStart) {
+            return !$p1IsStart;
+        }
+        $lineA = $hIsStart ? $hPt : $hOtherPt;
+        $lineB = $hIsStart ? $hOtherPt : $hPt;
+        return !Point::pointAboveOrOnLine($p12, $lineA, $lineB);
     }
 }
