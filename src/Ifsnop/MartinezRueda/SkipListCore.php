@@ -11,7 +11,7 @@ trait SkipListCore
 {
     private SkipNode $header;
     private int      $level    = 1;
-    private int      $maxLevel = 32;
+    private int      $maxLevel = 18;
 
     private function initSkip(): void
     {
@@ -21,14 +21,15 @@ trait SkipListCore
     }
 
     /** Altura aleatoria con p = 1/2 (skip list clásico). */
-    private function randomLevel(): int
-    {
-        $lvl = 1;
-        while ($lvl < $this->maxLevel && (\mt_rand() & 1)) {
-            $lvl++;
-        }
-        return $lvl;
+private function randomLevel(): int {
+    $r   = mt_rand();
+    $lvl = 1;
+    while ($lvl < $this->maxLevel && ($r & 1)) {
+        $r >>= 1;
+        $lvl++;
     }
+    return $lvl;
+}
 
     /**
      * Inserta $value justo después de los predecesores $update[i] de cada

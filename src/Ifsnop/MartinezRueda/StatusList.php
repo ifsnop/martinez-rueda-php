@@ -11,16 +11,19 @@ final class StatusList
     use SkipListCore;
 
     /** @var array<int,true> set de membresía para exists() */
-    private array $exists = [];
+    // private array $exists = [];
 
     public function __construct() { $this->initSkip(); }
 
     public function exists(?Node $node): bool
     {
+	return $node !== null && $node->inStatus; // isset($this->exists[\spl_object_id($node)]);
+/*
         if ($node === null) {
             return false;
         }
         return isset($this->exists[\spl_object_id($node)]);
+*/
     }
 
     /**
@@ -32,7 +35,7 @@ final class StatusList
     {
         $data->previous = null;
         $data->next     = null;
-        $data->remove   = static function () use ($data) {
+/*        $data->remove   = static function () use ($data) {
             if ($data->previous === null && $data->next === null) {
                 return;
             }
@@ -42,6 +45,7 @@ final class StatusList
             if ($next !== null) $next->previous = $prev;
             $data->previous = $data->next = null;
         };
+*/
         return $data;
     }
 
@@ -61,12 +65,14 @@ final class StatusList
         $after  = ($afterW  === null)          ? null : $afterW->value;
 
         $insert = function (Node $node) use ($ev): Node {
+	    $node->inStatus = true;
             $update = $this->searchStatus($ev);
             $w      = $this->linkAt($update, $node);
-            $this->exists[\spl_object_id($node)] = true;
+            // $this->exists[\spl_object_id($node)] = true;
             $node->remove = function () use ($node, $w) {
                 $this->unlink($w);
-                unset($this->exists[\spl_object_id($node)]);
+		$node->inStatus = false;
+                // unset($this->exists[\spl_object_id($node)]);
             };
             return $node;
         };

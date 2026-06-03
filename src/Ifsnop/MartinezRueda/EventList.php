@@ -158,9 +158,10 @@ final class EventList
      */
     private function eventCheckBefore(Point $p11, Point $p12, bool $p1IsStart, Node $here): bool
     {
-        $hPt      = $here->pt;
-        $hOtherPt = $here->other->pt;
-        $hIsStart = $here->isStart;
+	$hPt      = $here->pt;
+	$hOther   = $here->other;           // ← una sola desreferencia
+	$hOtherPt = $hOther !== null ? $hOther->pt : $here->pt; // defensivo
+	$hIsStart = $here->isStart;
 
         $comp = Point::compare($p11, $hPt);
         if ($comp !== 0) {

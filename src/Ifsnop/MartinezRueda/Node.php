@@ -15,6 +15,7 @@ final class Node {
     public $pt;
     public $seg;
     public $primary;
+    public bool $inStatus = false;
 
     public function __construct(
         bool $isRoot = false,
