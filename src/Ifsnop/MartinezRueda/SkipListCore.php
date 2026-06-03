@@ -11,7 +11,7 @@ trait SkipListCore
 {
     private SkipNode $header;
     private int      $level    = 1;
-    private int      $maxLevel = 18;
+    private int      $maxLevel = 32;
 
     private function initSkip(): void
     {
@@ -39,7 +39,7 @@ private function randomLevel(): int {
      *
      * @param array<int,SkipNode> $update
      */
-    private function linkAt(array $update, Node $value): SkipNode
+    private function linkAt(array &$update, Node $value): SkipNode
     {
         $h = $this->randomLevel();
         if ($h > $this->level) {
