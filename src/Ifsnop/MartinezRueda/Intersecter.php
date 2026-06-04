@@ -59,26 +59,37 @@ class Intersecter {
 
     public function eventAddSegment(Segment $segment, bool $primary): Node {
 
+	$cmp = Point::compare($segment->start, $segment->end);
+/*
     if ($segment->start->__eq($segment->end)) {
         throw new PolyBoolException(
 	"PolyBool: Zero-length segment detected; check input or adjust Algorithm::TOLERANCE"
         );
     }
+*/
+
+	if ($cmp === 0) {
+            throw new PolyBoolException(
+                "PolyBool: Zero-length segment detected; check input or adjust Algorithm::TOLERANCE"
+            );
+        }
 
 
-    // Si has procesado un evento de final (END) antes de que su evento de inicio (START)
-    //  hubiera sido insertado en la StatusList, por lo que $ev->status === null y lanza esa excepción.
-    // Zero-length segment detected.
-    // Normaliza el sentido del segmento: START = extremo "izquierdo" (o menor lexicográfico)
-    if (Point::compare($segment->start, $segment->end) > 0) {
-        $tmp = $segment->start;
-        $segment->start = $segment->end;
-        $segment->end = $tmp;
-    }
 
-    $evStart = $this->eventAddSegmentStart($segment, $primary);
-    $this->eventAddSegmentEnd($evStart, $segment, $primary);
-    return $evStart;
+        // Si has procesado un evento de final (END) antes de que su evento de inicio (START)
+	//  hubiera sido insertado en la StatusList, por lo que $ev->status === null y lanza esa excepción.
+        // Zero-length segment detected.
+	// Normaliza el sentido del segmento: START = extremo "izquierdo" (o menor lexicográfico)
+        if ($cmp > 0) {
+            $tmp = $segment->start;
+            $segment->start = $segment->end;
+            $segment->end = $tmp;
+	    $segment->recalcBounds(); //  recomendacion chatgpt 5.5!
+        }
+
+	$evStart = $this->eventAddSegmentStart($segment, $primary);
+        $this->eventAddSegmentEnd($evStart, $segment, $primary);
+        return $evStart;
     }
 
     private function eventUpdateEnd(Node $ev, Point $end): void {
