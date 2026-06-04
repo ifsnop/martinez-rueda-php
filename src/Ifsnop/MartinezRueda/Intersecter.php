@@ -93,8 +93,7 @@ class Intersecter {
     }
 
     private function eventUpdateEnd(Node $ev, Point $end): void {
-        //call_user_func($ev->other->remove);
-	($ev->other->remove)();
+	$this->eventRoot->remove($ev->other);
         $ev->seg->end = $end;
 	$ev->seg->recalcBounds();
         $ev->other->pt = $end;
@@ -229,7 +228,7 @@ class Intersecter {
 
                 $surrounding = $this->statusFindSurrounding($statusRoot, $ev);
 
-		if ($surrounding === null || !is_object($surrounding) || !is_callable($surrounding->insert ?? null)) {
+		if (!($surrounding instanceof Transition)) {
 		    throw new PolyBoolException(
 			"Invalid Transition from StatusList::findTransition"
 		    );
@@ -255,10 +254,8 @@ class Intersecter {
                     } else {
                         $eve->seg->otherFill = $ev->seg->myFill;
                     }
-                    //call_user_func($ev->other->remove);
-		    ($ev->other->remove)();
-                    //call_user_func($ev->remove);
-		    ($ev->remove)();
+		    $this->eventRoot->remove($ev->other);
+		    $this->eventRoot->remove($ev);
                 }
 
                 if ($this->eventRoot->getHead() !== $ev) {
@@ -339,7 +336,7 @@ class Intersecter {
 		    }
 		}
 
-		$ev->other->status = ($surrounding->insert)(StatusList::node(new Node(ev : $ev)));
+		$ev->other->status = $statusRoot->insert($ev, StatusList::node(new Node(ev : $ev)));
 	    } else { // !$ev->isStart
         	$st = $ev->status;
 	// en lugar de lanzar simplemente la excepcion, comprobamos si hubo un problema al tratar
@@ -355,7 +352,7 @@ class Intersecter {
 		    //Debug::log("  CHECK neighbors intersection (prev-next)");
                     $this->checkIntersection($st->previous->ev, $st->next->ev);
                 }
-		($st->remove)();
+		$statusRoot->remove($st);
 
 		if (!$ev->primary) {
 		    $s = $ev->seg->myFill;
@@ -364,8 +361,9 @@ class Intersecter {
 		}
 		$segments[] = $ev->seg;
 	    }
-	    ($this->eventRoot->getHead()->remove)();
+	    $this->eventRoot->remove($this->eventRoot->getHead());
 	}
         return $segments;
     }
 }
+

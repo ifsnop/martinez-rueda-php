@@ -126,8 +126,24 @@ final class EventList
     public function insertBefore(Node $ev, Point $otherPt): void
     {
         $update = $this->searchEvent($ev->pt, $otherPt, $ev->isStart);
-        $w      = $this->linkAt($update, $ev);
-        $ev->remove = function () use ($w) { $this->unlink($w); };
+        // Back-pointer al SkipNode en lugar de un closure por nodo: borrado en
+        // O(altura) vía remove() sin asignar un Closure (ni binding de $this) por
+        // cada evento insertado. Menos memoria y menos presión de GC en el camino crítico.
+        $ev->snode = $this->linkAt($update, $ev);
+    }
+
+    /**
+     * Desenlaza el evento $ev de la cola. Sustituye al antiguo closure
+     * `$ev->remove`. Idempotente: tras el borrado anula el back-pointer, de modo
+     * que una segunda llamada es un no-op (evita el doble-unlink que el closure
+     * podía ejecutar corrompiendo los vecinos del nivel 0).
+     */
+    public function remove(Node $ev): void
+    {
+        if ($ev->snode !== null) {
+            $this->unlink($ev->snode);
+            $ev->snode = null;
+        }
     }
 
     /**

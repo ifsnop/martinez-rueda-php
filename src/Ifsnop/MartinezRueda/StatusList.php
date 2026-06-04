@@ -50,10 +50,10 @@ final class StatusList
     }
 
     /**
-     * Localiza la posición de $ev y devuelve sus vecinos (before/after) más
-     * un closure `insert` que realiza la inserción real (re-buscando, porque
-     * el segmento de $ev puede haber sido dividido entre medias). Equivalente
-     * al comportamiento original, ahora en O(log n).
+     * Localiza la posición de $ev y devuelve sus vecinos (before/after).
+     * La inserción real se hace luego con insert(), que re-busca la posición
+     * porque el segmento de $ev puede haber sido dividido entre medias.
+     * O(log n).
      */
     public function findTransition(Node $ev): Transition
     {
@@ -64,20 +64,34 @@ final class StatusList
         $before = ($beforeW === $this->header) ? null : $beforeW->value;
         $after  = ($afterW  === null)          ? null : $afterW->value;
 
-        $insert = function (Node $node) use ($ev): Node {
-	    $node->inStatus = true;
-            $update = $this->searchStatus($ev);
-            $w      = $this->linkAt($update, $node);
-            // $this->exists[\spl_object_id($node)] = true;
-            $node->remove = function () use ($node, $w) {
-                $this->unlink($w);
-		$node->inStatus = false;
-                // unset($this->exists[\spl_object_id($node)]);
-            };
-            return $node;
-        };
+        return new Transition(after: $after, before: $before);
+    }
 
-        return new Transition(after: $after, before: $before, insert: $insert);
+    /**
+     * Inserta $node (que envuelve al evento $ev) en el estado, re-buscando la
+     * posición. Sustituye al antiguo closure `insert` de la Transition: ya no
+     * se asigna un Closure por evento START. Guarda el back-pointer $snode
+     * para que remove() pueda desenlazar en O(altura) sin closure.
+     */
+    public function insert(Node $ev, Node $node): Node
+    {
+        $node->inStatus = true;
+        $update = $this->searchStatus($ev);
+        $node->snode = $this->linkAt($update, $node);
+        return $node;
+    }
+
+    /**
+     * Desenlaza $node del estado. Sustituye al closure `$node->remove`.
+     * Idempotente: tras el borrado anula el back-pointer (segunda llamada = no-op).
+     */
+    public function remove(Node $node): void
+    {
+        if ($node->snode !== null) {
+            $this->unlink($node->snode);
+            $node->snode    = null;
+            $node->inStatus = false;
+        }
     }
 
     /**

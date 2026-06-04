@@ -6,11 +6,9 @@ namespace Ifsnop\MartinezRueda;
 final class Transition {
     public $after;
     public $before;
-    public $insert;
 
-    public function __construct(?Node $after, ?Node $before, callable $insert) {
+    public function __construct(?Node $after, ?Node $before) {
         $this->after = $after;
         $this->before = $before;
-        $this->insert = $insert;
     }
 }
