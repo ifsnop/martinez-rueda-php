@@ -228,11 +228,11 @@ class Intersecter {
 
                 $surrounding = $this->statusFindSurrounding($statusRoot, $ev);
 
-		if (!($surrounding instanceof Transition)) {
-		    throw new PolyBoolException(
-			"Invalid Transition from StatusList::findTransition"
-		    );
-		}
+//		if (!($surrounding instanceof Transition)) {
+//		    throw new PolyBoolException(
+//			"Invalid Transition from StatusList::findTransition"
+//		    );
+//		}
 
                 $above = $surrounding->before !== null ? $surrounding->before->ev : null;
                 $below = $surrounding->after !== null ? $surrounding->after->ev : null;

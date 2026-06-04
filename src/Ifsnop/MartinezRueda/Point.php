@@ -160,9 +160,9 @@ final class Point {
      * Comprueba si otro objeto es un punto equivalente (coordenadas casi iguales).
      */
     public function __eq($other): bool {
-        if (!($other instanceof Point)) {
-            return false;
-        }
+//        if (!($other instanceof Point)) {
+//            return false;
+//        }
 	$eps = Algorithm::TOLERANCE;
         return abs($this->x - $other->x) < $eps &&
                abs($this->y - $other->y) < $eps;
