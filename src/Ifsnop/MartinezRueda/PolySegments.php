@@ -6,9 +6,13 @@ namespace Ifsnop\MartinezRueda;
 final class PolySegments {
     public $segments;
     public $isInverted;
+    public ?array $bounds;
 
-    public function __construct(array $segments = null, bool $isInverted = false) {
+    public function __construct(array $segments = [], bool $isInverted = false, ?array $bounds = null) {
         $this->segments = $segments;
         $this->isInverted = $isInverted;
+        $this->bounds = $bounds;
     }
+
+
 }

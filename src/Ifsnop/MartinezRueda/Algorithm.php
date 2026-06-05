@@ -44,6 +44,70 @@ final class Algorithm {
         array_splice($chains, $index2, 1);
     }
 
+private static function makePolySegments(array $segments, bool $isInverted): PolySegments
+{
+    return new PolySegments(
+        segments: $segments,
+        isInverted: $isInverted,
+        bounds: self::segmentsBounds($segments)
+    );
+}
+
+private static function emptyPolySegments(bool $isInverted = false): PolySegments
+{
+    return new PolySegments([], $isInverted, null);
+}
+
+private static function segmentsBounds(array $segments): ?array
+{
+    if (empty($segments)) {
+        return null;
+    }
+
+    $minX = INF;
+    $minY = INF;
+    $maxX = -INF;
+    $maxY = -INF;
+
+    foreach ($segments as $s) {
+        if ($s->minX < $minX) $minX = $s->minX;
+        if ($s->minY < $minY) $minY = $s->minY;
+        if ($s->maxX > $maxX) $maxX = $s->maxX;
+        if ($s->maxY > $maxY) $maxY = $s->maxY;
+    }
+
+    return [$minX, $minY, $maxX, $maxY];
+}
+
+private static function boundsOverlap(?array $a, ?array $b): bool
+{
+    if ($a === null || $b === null) {
+        return false;
+    }
+
+    return !(
+        $a[2] < $b[0] ||
+        $b[2] < $a[0] ||
+        $a[3] < $b[1] ||
+        $b[3] < $a[1]
+    );
+}
+
+private static function mergeBounds(?array $a, ?array $b): ?array
+{
+    if ($a === null) return $b;
+    if ($b === null) return $a;
+
+    return [
+        min($a[0], $b[0]),
+        min($a[1], $b[1]),
+        max($a[2], $b[2]),
+        max($a[3], $b[3]),
+    ];
+}
+
+
+
 public static function segmentChainer(array $segments): array {
     $regions = [];
     $chains = [];
@@ -168,12 +232,17 @@ public static function segmentChainer(array $segments): array {
 }
 
     // core API
-    public static function segments($polygon) {
-	$regionIntersecter = new RegionIntersecter();
-	foreach ($polygon->regions as $region) {
-	    $regionIntersecter->addRegion($region);
-	}
-	return new PolySegments($regionIntersecter->calculate2($polygon->isInverted), $polygon->isInverted);
+    public static function segments($polygon): PolySegments
+    {
+    $regionIntersecter = new RegionIntersecter();
+
+    foreach ($polygon->regions as $region) {
+        $regionIntersecter->addRegion($region);
+    }
+
+    $segments = $regionIntersecter->calculate2($polygon->isInverted);
+
+    return self::makePolySegments($segments, $polygon->isInverted);
     }
 
     public static function combine($segments1, $segments2) {
@@ -189,6 +258,170 @@ public static function segmentChainer(array $segments): array {
 	    $segments2->isInverted
 	);
     }
+
+private static function combineSelect(
+    PolySegments $a,
+    PolySegments $b,
+    string $operation
+): PolySegments {
+    $segmentIntersecter = new SegmentIntersecter();
+
+    $combined = $segmentIntersecter->calculate2(
+        $a->segments,
+        $a->isInverted,
+        $b->segments,
+        $b->isInverted
+    );
+
+    return match ($operation) {
+        'union' => self::makePolySegments(
+            self::__selectUnionLogical($combined),
+            $a->isInverted || $b->isInverted
+        ),
+
+        'intersect' => self::makePolySegments(
+            self::__selectLogical($combined, fn(bool $A, bool $B) => $A && $B),
+            $a->isInverted && $b->isInverted
+        ),
+
+        'difference' => self::makePolySegments(
+            self::__selectLogical($combined, fn(bool $A, bool $B) => $A && !$B),
+            $a->isInverted && !$b->isInverted
+        ),
+
+        'differenceRev' => self::makePolySegments(
+            self::__selectLogical($combined, fn(bool $A, bool $B) => $B && !$A),
+            !$a->isInverted && $b->isInverted
+        ),
+
+        'xor' => self::makePolySegments(
+            self::__selectLogical($combined, fn(bool $A, bool $B) => $A xor $B),
+            $a->isInverted != $b->isInverted
+        ),
+
+        default => throw new \InvalidArgumentException("Operación no soportada: $operation"),
+    };
+}
+
+private static function unionSegments(PolySegments $a, PolySegments $b): PolySegments
+{
+    if (
+        !$a->isInverted &&
+        !$b->isInverted &&
+        !self::boundsOverlap($a->bounds, $b->bounds)
+    ) {
+        return new PolySegments(
+            segments: array_merge($a->segments, $b->segments),
+            isInverted: false,
+            bounds: self::mergeBounds($a->bounds, $b->bounds)
+        );
+    }
+
+    return self::combineSelect($a, $b, 'union');
+}
+
+private static function intersectSegments(PolySegments $a, PolySegments $b): PolySegments
+{
+    if (
+        !$a->isInverted &&
+        !$b->isInverted &&
+        !self::boundsOverlap($a->bounds, $b->bounds)
+    ) {
+        return self::emptyPolySegments(false);
+    }
+
+    return self::combineSelect($a, $b, 'intersect');
+}
+
+private static function xorSegments(PolySegments $a, PolySegments $b): PolySegments
+{
+    if (
+        !$a->isInverted &&
+        !$b->isInverted &&
+        !self::boundsOverlap($a->bounds, $b->bounds)
+    ) {
+        return new PolySegments(
+            segments: array_merge($a->segments, $b->segments),
+            isInverted: false,
+            bounds: self::mergeBounds($a->bounds, $b->bounds)
+        );
+    }
+
+    return self::combineSelect($a, $b, 'xor');
+}
+
+private static function differenceSegments(PolySegments $a, PolySegments $b): PolySegments
+{
+    if (
+        !$a->isInverted &&
+        !$b->isInverted &&
+        !self::boundsOverlap($a->bounds, $b->bounds)
+    ) {
+        return $a;
+    }
+
+    return self::combineSelect($a, $b, 'difference');
+}
+
+private static function differenceRevSegments(PolySegments $a, PolySegments $b): PolySegments
+{
+    if (
+        !$a->isInverted &&
+        !$b->isInverted &&
+        !self::boundsOverlap($a->bounds, $b->bounds)
+    ) {
+        return $b;
+    }
+
+    return self::combineSelect($a, $b, 'differenceRev');
+}
+
+private static function reduceBalanced(array $items, callable $op): PolySegments
+{
+    if (empty($items)) {
+        return self::emptyPolySegments(false);
+    }
+
+    while (count($items) > 1) {
+        $next = [];
+        $n = count($items);
+
+        for ($i = 0; $i < $n; $i += 2) {
+            if ($i + 1 >= $n) {
+                $next[] = $items[$i];
+                continue;
+            }
+
+            $next[] = $op($items[$i], $items[$i + 1]);
+        }
+
+        $items = $next;
+    }
+
+    return $items[0];
+}
+private static function polygonsToSegments(array $polygons): array
+{
+    $items = [];
+
+    foreach ($polygons as $polygon) {
+        $items[] = self::segments($polygon);
+    }
+
+    usort($items, function (PolySegments $a, PolySegments $b): int {
+        $ba = $a->bounds;
+        $bb = $b->bounds;
+
+        if ($ba === null && $bb === null) return 0;
+        if ($ba === null) return 1;
+        if ($bb === null) return -1;
+
+        return ($ba[0] <=> $bb[0]) ?: ($ba[1] <=> $bb[1]);
+    });
+
+    return $items;
+}
+
 
     /**
      * Selección específica para UNIÓN (A ∪ B) sin tabla.
@@ -239,14 +472,30 @@ public static function segmentChainer(array $segments): array {
 	return $p;
     }
 
-    public static function __operate($polygon1, $polygon2, $selector) {
-	$firstPolygonRegions = self::segments($polygon1);
-	$secondPolygonRegions = self::segments($polygon2);
-	$combinedSegments = self::combine($firstPolygonRegions, $secondPolygonRegions);
-	$selectedSegments = self::$selector($combinedSegments);
-	$p = self::polygon($selectedSegments);
-	return $p;
-    }
+public static function __operate($polygon1, $polygon2, $selector): Polygon
+{
+    $first = self::segments($polygon1);
+    $second = self::segments($polygon2);
+
+    $operation = match ($selector) {
+        'selectUnion' => 'union',
+        'selectIntersect' => 'intersect',
+        'selectDifference' => 'difference',
+        'selectDifferenceRev' => 'differenceRev',
+        'selectXor' => 'xor',
+        default => throw new \InvalidArgumentException("Selector no soportado: $selector"),
+    };
+
+    $result = match ($operation) {
+        'union' => self::unionSegments($first, $second),
+        'intersect' => self::intersectSegments($first, $second),
+        'difference' => self::differenceSegments($first, $second),
+        'differenceRev' => self::differenceRevSegments($first, $second),
+        'xor' => self::xorSegments($first, $second),
+    };
+
+    return self::polygon($result);
+}
 
     public static function splitSelfTouchingRegions(array $regions): array {
 	// Recorre cada región (anillo) y parte si hay puntos repetidos
@@ -321,45 +570,167 @@ public static function segmentChainer(array $segments): array {
 
 
     // helper functions for common operations
-    public static function union(...$args):Polygon {
-	if (count($args) === 1 && is_array($args[0])) {
-	    $polygons = $args[0];
-	    $firstSegments = self::segments($polygons[0]);
-	    $npolygons = count($polygons);
-	    for ($i = 1; $i < $npolygons; $i++) {
-		$secondSegments = self::segments($polygons[$i]);
-		$combined = self::combine($firstSegments, $secondSegments);
-		$firstSegments = self::selectUnion($combined);
-	    }
-	    return self::polygon($firstSegments);
-	} elseif (count($args) === 2 &&
-	    is_a($args[0], 'Ifsnop\MartinezRueda\Polygon') &&
-	    is_a($args[1], 'Ifsnop\MartinezRueda\Polygon')) {
-	    return self::__operate($args[0], $args[1], 'selectUnion');
-	} else {
-	    return Polygon::create()->fillFromArray([], true);
-	}
+public static function union(...$args): Polygon
+{
+    if (count($args) === 1 && is_array($args[0])) {
+        $polygons = $args[0];
+
+        if (empty($polygons)) {
+            return Polygon::create()->fillFromArray([], true);
+        }
+
+        $items = self::polygonsToSegments($polygons);
+
+        $result = self::reduceBalanced(
+            $items,
+            fn(PolySegments $a, PolySegments $b) => self::unionSegments($a, $b)
+        );
+
+        return self::polygon($result);
     }
 
-    public static function intersect($polygon1, $polygon2) {
-	return self::__operate($polygon1, $polygon2, 'selectIntersect');
+    if (
+        count($args) === 2 &&
+        is_a($args[0], Polygon::class) &&
+        is_a($args[1], Polygon::class)
+    ) {
+        return self::__operate($args[0], $args[1], 'selectUnion');
     }
 
-    public static function intersection($polygon1, $polygon2) {
-	return self::__operate($polygon1, $polygon2, 'selectIntersect');
+    return Polygon::create()->fillFromArray([], true);
+}
+
+public static function intersection(...$args): Polygon
+{
+    if (count($args) === 1 && is_array($args[0])) {
+        $polygons = $args[0];
+
+        if (empty($polygons)) {
+            return Polygon::create()->fillFromArray([], false);
+        }
+
+        $items = self::polygonsToSegments($polygons);
+
+        $result = self::reduceBalanced(
+            $items,
+            fn(PolySegments $a, PolySegments $b) => self::intersectSegments($a, $b)
+        );
+
+        return self::polygon($result);
     }
 
-    public static function difference($polygon1, $polygon2) {
-	return self::__operate($polygon1, $polygon2, 'selectDifference');
+    if (count($args) === 2) {
+        return self::__operate($args[0], $args[1], 'selectIntersect');
     }
 
-    public static function differenceRev($polygon1, $polygon2) {
-	return self::__operate($polygon1, $polygon2, 'selectDifferenceRev');
+    return Polygon::create()->fillFromArray([], false);
+}
+
+public static function intersect(...$args): Polygon
+{
+    return self::intersection(...$args);
+}
+
+public static function xoring(...$args): Polygon
+{
+    if (count($args) === 1 && is_array($args[0])) {
+        $polygons = $args[0];
+
+        if (empty($polygons)) {
+            return Polygon::create()->fillFromArray([], false);
+        }
+
+        $items = self::polygonsToSegments($polygons);
+
+        $result = self::reduceBalanced(
+            $items,
+            fn(PolySegments $a, PolySegments $b) => self::xorSegments($a, $b)
+        );
+
+        return self::polygon($result);
     }
 
-    public static function xoring($polygon1, $polygon2) {
-	return self::__operate($polygon1, $polygon2, 'selectXor');
+    if (count($args) === 2) {
+        return self::__operate($args[0], $args[1], 'selectXor');
     }
+
+    return Polygon::create()->fillFromArray([], false);
+}
+
+public static function difference(...$args): Polygon
+{
+    if (count($args) === 1 && is_array($args[0])) {
+        $polygons = $args[0];
+
+        if (empty($polygons)) {
+            return Polygon::create()->fillFromArray([], false);
+        }
+
+        if (count($polygons) === 1) {
+            return $polygons[0];
+        }
+
+        $base = self::segments($polygons[0]);
+
+        $subtractors = array_slice($polygons, 1);
+        $subtractorsSegments = self::polygonsToSegments($subtractors);
+
+        $subtractorUnion = self::reduceBalanced(
+            $subtractorsSegments,
+            fn(PolySegments $a, PolySegments $b) => self::unionSegments($a, $b)
+        );
+
+        $result = self::differenceSegments($base, $subtractorUnion);
+
+        return self::polygon($result);
+    }
+
+    if (count($args) === 2) {
+        return self::__operate($args[0], $args[1], 'selectDifference');
+    }
+
+    return Polygon::create()->fillFromArray([], false);
+}
+
+// el último menos todos los anteriores
+public static function differenceRev(...$args): Polygon
+{
+    if (count($args) === 1 && is_array($args[0])) {
+        $polygons = $args[0];
+
+        if (empty($polygons)) {
+            return Polygon::create()->fillFromArray([], false);
+        }
+
+        if (count($polygons) === 1) {
+            return $polygons[0];
+        }
+
+        $lastIndex = count($polygons) - 1;
+
+        $base = self::segments($polygons[$lastIndex]);
+
+        $subtractors = array_slice($polygons, 0, $lastIndex);
+        $subtractorsSegments = self::polygonsToSegments($subtractors);
+
+        $subtractorUnion = self::reduceBalanced(
+            $subtractorsSegments,
+            fn(PolySegments $a, PolySegments $b) => self::unionSegments($a, $b)
+        );
+
+        $result = self::differenceSegments($base, $subtractorUnion);
+
+        return self::polygon($result);
+    }
+
+    if (count($args) === 2) {
+        return self::__operate($args[0], $args[1], 'selectDifferenceRev');
+    }
+
+    return Polygon::create()->fillFromArray([], false);
+}
+
+
 
     /**
      * Helper genérico: selecciona segmentos por operación booleana a nivel de lado.
