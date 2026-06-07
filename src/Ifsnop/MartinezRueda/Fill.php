@@ -10,12 +10,12 @@ namespace Ifsnop\MartinezRueda;
 final class Fill
 {
     // Se definen dos propiedades públicas: $below y $above.
-    public $below;
-    public $above;
+    public ?bool$below;
+    public ?bool $above;
 
     // Constructor de la clase, acepta dos parámetros booleanos opcionales.
-    // Si no se pasan, serán null por defecto.
-    public function __construct(bool $below = null, bool $above = null)
+    // Si no se pasan, serán false por defecto.
+    public function __construct(?bool $below = null, ?bool $above = null)
     {
         // Se asignan los valores recibidos a las propiedades del objeto.
         $this->below = $below;

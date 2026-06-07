@@ -46,7 +46,6 @@ class Intersecter
         );
         $this->eventAdd($evStart, $segment->end);
 
-        //Debug::log("ADD START: %s (primary=%s)", Debug::evStr($evStart), $primary ? 'Y' : 'N'); Debug::dumpEventQueue($this->eventRoot);
         return $evStart;
     }
 
@@ -63,28 +62,18 @@ class Intersecter
         );
         $evStart->other = $evEnd;
         $this->eventAdd($evEnd, $evStart->pt);
-        //Debug::log("ADD END  : %s (primary=%s)", Debug::evStr($evEnd), $primary ? 'Y' : 'N'); Debug::dumpEventQueue($this->eventRoot);
     }
 
     public function eventAddSegment(Segment $segment, bool $primary): Node
     {
 
         $cmp = Point::compare($segment->start, $segment->end);
-        /*
-    if ($segment->start->__eq($segment->end)) {
-        throw new PolyBoolException(
-	"PolyBool: Zero-length segment detected; check input or adjust Algorithm::TOLERANCE"
-        );
-    }
-*/
 
         if ($cmp === 0) {
             throw new PolyBoolException(
                 "PolyBool: Zero-length segment detected; check input or adjust Algorithm::TOLERANCE"
             );
         }
-
-
 
         // Si has procesado un evento de final (END) antes de que su evento de inicio (START)
         //  hubiera sido insertado en la StatusList, por lo que $ev->status === null y lanza esa excepción.
@@ -138,7 +127,6 @@ class Intersecter
         $seg1 = $ev1->seg;
         $seg2 = $ev2->seg;
 
-
         // --- Rechazo temprano por AABB cacheada ---
         if (
             $seg1->maxX < $seg2->minX || $seg2->maxX < $seg1->minX ||
@@ -151,11 +139,6 @@ class Intersecter
         $a2 = $seg1->end;
         $b1 = $seg2->start;
         $b2 = $seg2->end;
-
-        // Rechazo temprano por bbox
-        //if (!self::bboxOverlap($a1, $a2, $b1, $b2)) {
-        //    return null;
-        //}
 
         $i = Point::linesIntersect($a1, $a2, $b1, $b2);
         if ($i === null) {
@@ -238,20 +221,12 @@ class Intersecter
             if ($ev->isStart) {
                 // Backup: si un segmento degenerado ha entrado, detectarlo aquí también
                 if ($ev->seg !== null && $ev->seg->start->__eq($ev->seg->end)) {
-                    //Debug::log("!! START WITH ZERO-LEN SEG: %s", Debug::segStr($ev->seg));
                     throw new PolyBoolException(
                         "PolyBool: Zero-length segment detected during processing; check input/TOLERANCE"
                     );
                 }
 
                 $surrounding = $this->statusFindSurrounding($statusRoot, $ev);
-
-                //		if (!($surrounding instanceof Transition)) {
-                //		    throw new PolyBoolException(
-                //			"Invalid Transition from StatusList::findTransition"
-                //		    );
-                //		}
-
                 $above = $surrounding->before !== null ? $surrounding->before->ev : null;
                 $below = $surrounding->after !== null ? $surrounding->after->ev : null;
 
@@ -260,7 +235,7 @@ class Intersecter
 
                     if ($this->selfIntersection) {
                         $toggle = false;
-                        if (/*$ev->seg->myFill === null || */$ev->seg->myFill->below === null) {
+                        if ($ev->seg->myFill->below === null) {
                             $toggle = true;
                         } else {
                             $toggle = $ev->seg->myFill->above !== $ev->seg->myFill->below;
@@ -277,7 +252,6 @@ class Intersecter
                 }
 
                 if ($this->eventRoot->getHead() !== $ev) {
-                    //Debug::log("  → Head changed by division; continue");
                     continue;
                 }
 
@@ -302,8 +276,6 @@ class Intersecter
                     } else {
                         $mf->above = $mf->below;
                     }
-
-                    //Debug::log("  FILL(self): my[below=%s, above=%s]", $ev->seg->myFill->below ? '1':'0', $ev->seg->myFill->above ? '1':'0');
                 } else { // !$this->selfIntersection
 
                     // Evitar utilizar sementos no inicializados
@@ -366,8 +338,6 @@ class Intersecter
                     throw new PolyBoolException("PolyBool: $detail; check segment orientation or TOLERANCE");
                 }
                 if ($statusRoot->exists($st->previous) && $statusRoot->exists($st->next)) {
-
-                    //Debug::log("  CHECK neighbors intersection (prev-next)");
                     $this->checkIntersection($st->previous->ev, $st->next->ev);
                 }
                 $statusRoot->remove($st);

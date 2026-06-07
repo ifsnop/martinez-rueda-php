@@ -1,16 +1,8 @@
 includes:
     - vendor/shipmonk/dead-code-detector/rules.neon
 parameters:
-    level: 4                # Ajusta el nivel a tu gusto (0–max, 8 recomendado)
+    level: 5
     paths:
-        - src/
-        - tests/
-        - tests.php
-    shipmonkDeadCode:
-        usageProviders:
-            phpunit:
-                enabled: true       # considera métodos usados vía PHPUnit
-            reflection:
-                enabled: true       # marca como "usado" lo accedido por Reflection
-            vendor:
-                enabled: true       # no reporta como muerto lo que sobreescribe APIs de vendor
+        - ./src/Ifnsop/MartinezRueda/*.php
+    excludePaths:
+        - 'tests/*'

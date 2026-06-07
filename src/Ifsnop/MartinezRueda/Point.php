@@ -7,8 +7,8 @@ namespace Ifsnop\MartinezRueda;
 final class Point
 {
     /* Coordenadas privadas del punto */
-    public $x;
-    public $y;
+    public float $x;
+    public float $y;
 
     /* Constructor: inicializa el punto con coordenadas x e y (tipo float) */
     public function __construct(float $x, float $y)
@@ -172,7 +172,7 @@ final class Point
     /*
      * Comprueba si otro objeto es un punto equivalente (coordenadas casi iguales).
      */
-    public function __eq($other): bool
+    public function __eq(Point $other): bool
     {
         $eps = Algorithm::TOLERANCE;
         return abs($this->x - $other->x) < $eps &&

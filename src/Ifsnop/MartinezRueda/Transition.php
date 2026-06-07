@@ -6,8 +6,8 @@ namespace Ifsnop\MartinezRueda;
 
 final class Transition
 {
-    public $after;
-    public $before;
+    public ?Node $after;
+    public ?Node $before;
 
     public function __construct(?Node $after, ?Node $before)
     {

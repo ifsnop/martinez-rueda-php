@@ -6,18 +6,16 @@ namespace Ifsnop\MartinezRueda;
 
 final class Polygon
 {
-	public $regions;
-	public $isInverted;
-	public $numPoints;
+	public array $regions;
+	public bool $isInverted;
+	public int $numPoints;
 
 	public function __toString(): string
 	{
 		$str = "";
 		foreach ($this->regions as $region) {
 			$str .= "[";
-			// var_dump($region);
 			foreach ($region as $points) {
-				// var_dump($points);
 				$str .= $points . ",";
 			}
 			$str = substr($str, 0, -1) . "],";
@@ -54,14 +52,12 @@ final class Polygon
 
 	public function __construct()
 	{
-		//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 		$this->regions = [];
 		$this->numPoints = 0;
 	}
 
 	public static function create()
 	{
-		//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
 		return new self();
 	}
 
@@ -145,53 +141,4 @@ final class Polygon
 		$this->isInverted = $isInverted;
 		return $this;
 	}
-
-
-	/*
-    public function fillFromPolySegments(PolySegments $regions, bool $isInverted = false) {
-	//if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-        $_regions = [];
-        foreach ($regions as $region) {
-            $tmp = [];
-	    print "Polygon::__construct" . PHP_EOL;
-	    if ( is_bool($region)) {
-		var_dump($region);
-		var_dump($regions);
-		print_r($regions); // falla cuando le pasas un polysegments, porque hay segments y una variable con isInverted!
-		print "ERROR1" . PHP_EOL;
-		exit(0);
-	    }
-            foreach ($region as $pt) {
-		print_r($pt);
-                if ($pt instanceof Point) {
-                    $tmp[] = $pt;
-                } elseif (is_array($pt) && count($pt) == 2) {
-                    list($x, $y) = $pt;
-                    $tmp[] = new Point($x, $y);
-                }
-            }
-            $_regions[] = $tmp;
-        }
-
-        $this->regions = $_regions;
-        $this->isInverted = $isInverted;
-	return $this;
-    }
-
-
-    private static function array_depth($value): int {
-	if (!is_array($value)) {
-	    return 0; // No es array
-	}
-	if ($value === []) {
-	    return 1; // Array vacío cuenta como nivel 1
-	}
-
-	$max = 1; // Este nivel
-	foreach ($value as $item) {
-	    $max = max($max, 1 + self::array_depth($item));
-	}
-	return $max;
-    }
-*/
 }

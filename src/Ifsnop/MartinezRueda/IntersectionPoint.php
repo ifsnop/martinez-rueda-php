@@ -6,9 +6,9 @@ namespace Ifsnop\MartinezRueda;
 
 final class IntersectionPoint
 {
-    public $alongA;
-    public $alongB;
-    public $point;
+    public int $alongA;
+    public int $alongB;
+    public Point $point;
 
     public function __construct(int $alongA, int $alongB, Point $point)
     {

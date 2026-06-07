@@ -17,7 +17,7 @@ final class GJTools
      *
      * @param string|array|object $geojsonSource Ruta a archivo .geojson, JSON en string o estructura ya decodificada.
      * @return array Array de polígonos: [ [ [ [x,y], ... ], [holeRing], ... ], ... ]
-     * @throws InvalidArgumentException Si el JSON no es válido o el objeto no es GeoJSON válido.
+     * @throws \InvalidArgumentException Si el JSON no es válido o el objeto no es GeoJSON válido.
      */
     public static function geojsonToArray($geojsonSource): array
     {
@@ -270,7 +270,7 @@ final class GJTools
         return $out;
     }
 
-    public static function removeColinearPointsFromPolygon($polygonCoords): array
+    public static function removeColinearPointsFromPolygon(array $polygonCoords): array
     {
         // Asegura que el anillo esté cerrado
         if ($polygonCoords[0] !== end($polygonCoords)) {
@@ -431,19 +431,19 @@ final class GJTools
      *
      * @param string $coordinatesJson Cadena JSON de coordinates (p.ej. '[[[0,0],[1,0],[1,1],[0,1],[0,0]]]')
      * @return 'Polygon'|'MultiPolygon'
-     * @throws InvalidArgumentException Si la cadena no es JSON válido o no tiene la estructura mínima.
+     * @throws \InvalidArgumentException Si la cadena no es JSON válido o no tiene la estructura mínima.
      */
     public static function detectGeometryTypeFromCoordinatesString(string $coordinatesJson): string
     {
         $coords = json_decode(trim($coordinatesJson), true);
         if ($coords === null && json_last_error() !== JSON_ERROR_NONE) {
-            throw new InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
+            throw new \InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
         }
         if (!is_array($coords)) {
-            throw new InvalidArgumentException("coordinates debe decodificar a un array.");
+            throw new \InvalidArgumentException("coordinates debe decodificar a un array.");
         }
         if (empty($coords)) {
-            throw new InvalidArgumentException("coordinates no puede estar vacío.");
+            throw new \InvalidArgumentException("coordinates no puede estar vacío.");
         }
 
         // 1) Validación estructural primero (más fiable)
@@ -454,7 +454,7 @@ final class GJTools
             return 'MultiPolygon';
         }
 
-        throw new InvalidArgumentException(
+        throw new \InvalidArgumentException(
             "La estructura de 'coordinates' no corresponde a Polygon ni MultiPolygon."
         );
     }
@@ -465,18 +465,18 @@ final class GJTools
      *
      * @param array $coords Array JSON de coordinates (p.ej. [[[0,0],[1,0],[1,1],[0,1],[0,0]]] )
      * @return 'Polygon'|'MultiPolygon'
-     * @throws InvalidArgumentException Si la cadena no es JSON válido o no tiene la estructura mínima.
+     * @throws \InvalidArgumentException Si la cadena no es JSON válido o no tiene la estructura mínima.
      */
     public static function detectGeometryTypeFromCoordinatesArray(array $coords): string
     {
         //if ($coords === null && json_last_error() !== JSON_ERROR_NONE) {
-        //    throw new InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
+        //    throw new \InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
         //}
         if (!is_array($coords)) {
-            throw new InvalidArgumentException("coordinates debe decodificar a un array.");
+            throw new \InvalidArgumentException("coordinates debe decodificar a un array.");
         }
         if (empty($coords)) {
-            throw new InvalidArgumentException("coordinates no puede estar vacío.");
+            throw new \InvalidArgumentException("coordinates no puede estar vacío.");
         }
 
         // 1) Validación estructural primero (más fiable)
@@ -487,13 +487,13 @@ final class GJTools
             return 'MultiPolygon';
         }
 
-        throw new InvalidArgumentException(
+        throw new \InvalidArgumentException(
             "La estructura de 'coordinates' no corresponde a Polygon ni MultiPolygon."
         );
     }
 
     /** Heurística: ¿parece array de rings (cada uno array de positions)? */
-    private static function isPolygonCoordinates($coords): bool
+    private static function isPolygonCoordinates(array $coords): bool
     {
         if (!is_array($coords) || empty($coords)) return false;
         // Debe haber al menos un ring que contenga alguna posición [x,y]
@@ -511,7 +511,7 @@ final class GJTools
     }
 
     /** Heurística: ¿parece array de polígonos, cada uno con rings que contienen positions? */
-    private static function isMultiPolygonCoordinates($coords): bool
+    private static function isMultiPolygonCoordinates(array $coords): bool
     {
         if (!is_array($coords) || empty($coords)) return false;
         foreach ($coords as $poly) {
@@ -530,7 +530,7 @@ final class GJTools
     }
 
     /** Devuelve true si $arr tiene pinta de posición [x,y(,z...)] */
-    private static function looksLikePosition($arr): bool
+    private static function looksLikePosition(array $arr): bool
     {
         if (!is_array($arr) || count($arr) < 2) return false;
         // Los dos primeros deben ser numéricos

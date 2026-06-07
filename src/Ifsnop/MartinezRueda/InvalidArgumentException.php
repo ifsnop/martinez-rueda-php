@@ -1,5 +1,5 @@
 <?php
-
+/*
 declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
@@ -66,3 +66,4 @@ final class InvalidArgumentException extends \Exception
         return implode("\n", $lines);
     }
 }
+*/

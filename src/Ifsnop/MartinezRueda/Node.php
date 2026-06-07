@@ -6,31 +6,32 @@ namespace Ifsnop\MartinezRueda;
 
 final class Node
 {
-    public $status;
-    public $other;
-    public $ev;
-    public $previous;
-    public $next;
-    public $isRoot;
-    public $isStart;
-    public $pt;
-    public $seg;
-    public $primary;
-    public bool $inStatus = false;
-    /** Wrapper del nodo en la skip list (EventList o StatusList): back-pointer para borrado O(altura) sin closure. */
-    public ?SkipNode $snode = null;
+    public bool $isRoot;      // true si es el nodo centinela raíz de la lista
+    public bool $isStart;     // true si es evento START, false si es END
+
+    public ?Node $status;     // nodo en StatusList que corresponde a este evento
+    public ?Node $other;      // el evento END paired con este START (o viceversa)
+    public ?Node $ev;         // back-pointer al evento desde un nodo de StatusList
+    public ?Node $previous;   // nodo anterior en la lista enlazada
+    public ?Node $next;       // nodo siguiente en la lista enlazada
+
+    public ?Point   $pt;      // coordenadas del evento
+    public ?Segment $seg;     // segmento al que pertenece este evento
+    public bool     $primary; // true si es el evento primario (no el espejo)
+    public bool     $inStatus = false;
+    public ?SkipNode $snode    = null;
 
     public function __construct(
         bool $isRoot = false,
         bool $isStart = false,
-        $pt = null,
-        $seg = null,
+        ?Point $pt = null,
+        ?Segment $seg = null,
         bool $primary = false,
-        Node $next = null,
-        Node $previous = null,
-        Node $other = null,
-        Node $ev = null,
-        Node $status = null
+        ?Node $next = null,
+        ?Node $previous = null,
+        ?Node $other = null,
+        ?Node $ev = null,
+        ?Node $status = null
     ) {
         $this->status = $status;
         $this->other = $other;

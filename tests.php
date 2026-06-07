@@ -225,7 +225,7 @@ print "result 2#" . $result->numPoints . PHP_EOL;
 
 
 $fail = false;
-$debug = true;
+$debug = false;
 foreach ($test as $test_number => $test_predicates) {
 	$pa = MR\Polygon::create()->fillFromArray($test_predicates['region_a']);
 	$pb = MR\Polygon::create()->fillFromArray($test_predicates['region_b']);

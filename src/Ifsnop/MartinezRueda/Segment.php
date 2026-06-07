@@ -20,7 +20,6 @@ final class Segment
 
     public function __construct(Point $start, Point $end, Fill $myFill = null, Fill $otherFill = null)
     {
-        // if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
         $this->start = $start;
         $this->end = $end;
         $this->myFill = $myFill;
