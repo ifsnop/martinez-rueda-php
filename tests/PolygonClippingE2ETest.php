@@ -226,7 +226,9 @@ final class PolygonClippingE2ETest extends TestCase
         }
 
         foreach ($dirs as $d) {
-	//if ( false === strpos($d, "poly-with-hole-and-square") )
+	//if ( false === strpos($d, "almost-colinear-segments-but-not") )
+	//    continue;
+	//if ( false === strpos($d, "continents_europe") )
 	//    continue;
 	//    if ( false === strpos($d, "multipoly-with-hole-and-square") )
 	//	continue;
@@ -311,7 +313,11 @@ final class PolygonClippingE2ETest extends TestCase
 	    // print "runOpMulti $i: " . json_encode($geomList[$i]) . PHP_EOL;
 	    if ( self::isDebugEnabled() )
 		print $op . ":\t" . json_encode($geomList[$i]) . PHP_EOL;
+	    //print PHP_EOL . PHP_EOL . PHP_EOL . PHP_EOL . PHP_EOL . PHP_EOL . json_encode($acc) . PHP_EOL;
+	    //print PHP_EOL . json_encode($geomList[$i]) . PHP_EOL;
+	    //print "llamando a $op" . PHP_EOL;
 	    $acc = self::runOp($acc, $geomList[$i], $op);
+
 	    if ( self::isDebugEnabled() )
 		print "acc $i\t" . json_encode($acc) . PHP_EOL;
 	    // (Opcional) micro‑optimizaciones:
@@ -370,6 +376,7 @@ final class PolygonClippingE2ETest extends TestCase
 	    self::comparePolygons($got_normalized, $exp_normalized, $diff),
             "Diferencia detectada" . PHP_EOL .
 	    "input" . PHP_EOL . $input .PHP_EOL .
+	    "operation" . PHP_EOL . "\t" . $op . PHP_EOL .
             "got" . PHP_EOL . "\t" . json_encode($got_normalized) . PHP_EOL .
             "expected" . PHP_EOL . "\t" . json_encode($exp_normalized) . PHP_EOL .
 	    "diff" . PHP_EOL . "\t" . json_encode($diff) . PHP_EOL . PHP_EOL

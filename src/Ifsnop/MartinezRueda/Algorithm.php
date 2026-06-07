@@ -7,42 +7,70 @@ final class Algorithm {
     public const TOLERANCE = 1e-12; //12; //9;
     public const DEBUG = false;
 
-    public static function reverseChain(&$chains, int $index) {
-	$chains[$index] = array_reverse($chains[$index]);
+private static function pointKey(Point $p): string
+{
+    $inv = 1.0 / Algorithm::TOLERANCE;
+    return (int)round($p->x * $inv) . ',' . (int)round($p->y * $inv);
+}
+
+private static function reverseChainIdx(
+    array &$chains,
+    array &$headIndex,
+    array &$tailIndex,
+    int $id
+): void {
+    $oldHeadKey = self::pointKey($chains[$id][0]);
+    $oldTailKey = self::pointKey(end($chains[$id]));
+    $chains[$id] = array_reverse($chains[$id]);
+    unset($headIndex[$oldHeadKey], $tailIndex[$oldTailKey]);
+    $headIndex[$oldTailKey] = $id;
+    $tailIndex[$oldHeadKey] = $id;
+}
+
+private static function appendChainIdx(
+    array &$chains,
+    array &$headIndex,
+    array &$tailIndex,
+    int $id1,
+    int $id2
+): void {
+    if (!isset($chains[$id1], $chains[$id2])) {
+        return;
     }
-
-    public static function appendChain(&$chains, int $index1, int $index2) {
-
-	// Snapshot rápido para logging sin tocar referencias
-        $exists1 = array_key_exists($index1, $chains);
-        $exists2 = array_key_exists($index2, $chains);
-
-	// Si alguno no existe, no sigas: el problema está en el caller
-        if (!$exists1 || !$exists2) {
-            return; // Solo para depurar: evita notice y nos deja pista
+    $chain1 = &$chains[$id1];
+    $chain2 = &$chains[$id2];
+    $lenC1  = count($chain1);
+    $lenC2  = count($chain2);
+    // Capturar claves externas ANTES de cualquier modificación
+    $headKey2Ext = self::pointKey($chain2[0]);
+    $tailKey2Ext = self::pointKey($chain2[$lenC2 - 1]);
+    $tailKey1Ext = self::pointKey($chain1[$lenC1 - 1]);
+    // Simplificación colineal en el punto de empalme
+    $tail = $chain1[$lenC1 - 1];
+    $head = $chain2[0];
+    if ($lenC1 >= 2) {
+        $tail2 = $chain1[$lenC1 - 2];
+        if (Point::collinear($tail2, $tail, $head)) {
+            array_pop($chain1);
+            $tail = $tail2;
         }
-
-	$chain1 = &$chains[$index1];
-        $chain2 = &$chains[$index2];
-
-        $tail  = end($chain1);
-	$tail2 = $chain1[count($chain1)-2];
-        $head  = $chain2[0];
+    }
+    if ($lenC2 >= 2) {
         $head2 = $chain2[1];
-
-	if (Point::collinear($tail2, $tail, $head)) {
-	    array_pop($chain1);
-    	    $tail = $tail2;
+        if (Point::collinear($tail, $head, $head2)) {
+            array_shift($chain2);
         }
-
-	if (Point::collinear($tail, $head, $head2)) {
-    	    // if (Algorithm::DEBUG) echo "  collinear(tail,head,head2): shift head of chain2\n";
-	    array_shift($chain2);
-        }
-
-	$chains[$index1] = array_merge($chain1, $chain2);
-        array_splice($chains, $index2, 1);
     }
+    // Actualizar índices
+    unset($tailIndex[$tailKey1Ext], $headIndex[$headKey2Ext]);
+    unset($tailIndex[$tailKey2Ext]);
+    // Fusionar chain1 ← chain2
+    $chains[$id1] = array_merge($chain1, $chain2);
+    $tailIndex[$tailKey2Ext] = $id1;
+    // Eliminar chain2 en O(1)
+    unset($chains[$id2]);
+}
+
 
 private static function makePolySegments(array $segments, bool $isInverted): PolySegments
 {
@@ -106,130 +134,178 @@ private static function mergeBounds(?array $a, ?array $b): ?array
     ];
 }
 
+public static function segmentChainer(array $segments): array
+{
+    $regions   = [];
+    $chains    = [];   // id => Point[]
+    $headIndex = [];   // pointKey => chain id
+    $tailIndex = [];   // pointKey => chain id
+    $nextId    = 0;
 
-
-public static function segmentChainer(array $segments): array {
-    $regions = [];
-    $chains = [];
-
-    foreach ($segments as $k => $segment) {
+    foreach ($segments as $segment) {
         $point1 = $segment->start;
         $point2 = $segment->end;
         if ($point1->__eq($point2)) {
-            //if (Algorithm::DEBUG) echo "Skip zero-length segment at k=$k\n";
             continue;
         }
+        $key1 = self::pointKey($point1);
+        $key2 = self::pointKey($point2);
 
-        $segmentChainerMatcher = new SegmentChainerMatcher();
+        // Lookup O(1)
+        $matchId1Head = $headIndex[$key1] ?? null;  // head == point1
+        $matchId1Tail = $tailIndex[$key1] ?? null;  // tail == point1
+        $matchId2Head = $headIndex[$key2] ?? null;  // head == point2
+        $matchId2Tail = $tailIndex[$key2] ?? null;  // tail == point2
 
-	$nchains = count($chains);
-        for ($i = 0; $i < $nchains; $i++) {
-            $chain = &$chains[$i];
-            $head = $chain[0];
-            $tail = end($chain);
+        // Construir candidatos en el mismo orden de prioridad que el original:
+        // head==pt1, head==pt2, tail==pt1, tail==pt2
+        $candidates = [];
+        if ($matchId1Head !== null) $candidates[] = [$matchId1Head, true,  true];
+        if ($matchId2Head !== null) $candidates[] = [$matchId2Head, true,  false];
+        if ($matchId1Tail !== null) $candidates[] = [$matchId1Tail, false, true];
+        if ($matchId2Tail !== null) $candidates[] = [$matchId2Tail, false, false];
 
-            if ($head->__eq($point1)) {
-                //if (Algorithm::DEBUG) echo "  MATCH head==P1 with chain[$i]\n";
-                if ($segmentChainerMatcher->setMatch($i, true, true)) { break; }
-            } elseif ($head->__eq($point2)) {
-                //if (Algorithm::DEBUG) echo "  MATCH head==P2 with chain[$i]\n";
-                if ($segmentChainerMatcher->setMatch($i, true, false)) { break; }
-            } elseif ($tail->__eq($point1)) {
-                //if (Algorithm::DEBUG) echo "  MATCH tail==P1 with chain[$i]\n";
-                if ($segmentChainerMatcher->setMatch($i, false, true)) { break; }
-            } elseif ($tail->__eq($point2)) {
-                //if (Algorithm::DEBUG) echo "  MATCH tail==P2 with chain[$i]\n";
-                if ($segmentChainerMatcher->setMatch($i, false, false)) { break; }
+        // Deduplicar por id y tomar los dos primeros
+        $firstMatch  = null;
+        $secondMatch = null;
+        $seen = [];
+        foreach ($candidates as [$cid, $cHead, $cPt1]) {
+            if (isset($seen[$cid])) continue;
+            $seen[$cid] = true;
+            if ($firstMatch === null) {
+                $firstMatch = [$cid, $cHead, $cPt1];
+            } else {
+                $secondMatch = [$cid, $cHead, $cPt1];
+                break;
             }
         }
 
-        // 0 matches: crea nueva cadena
-        if ($segmentChainerMatcher->nextMatch === $segmentChainerMatcher->firstMatch) {
-            $chains[] = [$point1, $point2];
+        // El original itera cadenas por ID creciente → menor ID = firstMatch.
+        // Normalizar para garantizar topología idéntica al original.
+        if ($firstMatch !== null && $secondMatch !== null
+            && $firstMatch[0] > $secondMatch[0])
+        {
+            [$firstMatch, $secondMatch] = [$secondMatch, $firstMatch];
+        }
+
+        // ── Caso 0: sin match → nueva cadena ─────────────────────────────
+        if ($firstMatch === null) {
+            $id = $nextId++;
+            $chains[$id]      = [$point1, $point2];
+            $headIndex[$key1] = $id;
+            $tailIndex[$key2] = $id;
             continue;
         }
 
-        // 1 match: extiende cadena
-        if ($segmentChainerMatcher->nextMatch === $segmentChainerMatcher->secondMatch) {
-            $index = $segmentChainerMatcher->firstMatch->index;
-            $point = $segmentChainerMatcher->firstMatch->matchesPt1 ? $point2 : $point1;
-            $addToHead = $segmentChainerMatcher->firstMatch->matchesHead;
+        // ── Caso 1: un solo match → extender ─────────────────────────────
+        if ($secondMatch === null) {
+            [$index, $matchesHead, $matchesPt1] = $firstMatch;
+            $point     = $matchesPt1 ? $point2 : $point1;
+            $pointKey  = $matchesPt1 ? $key2   : $key1;
+            $addToHead = $matchesHead;
+            $chain     = &$chains[$index];
+            $lenC      = count($chain);
+            $grow      = $addToHead ? $chain[0]        : $chain[$lenC - 1];
+            $grow2     = $addToHead
+                ? ($chain[1]        ?? $chain[0])
+                : ($chain[$lenC - 2] ?? $chain[$lenC - 1]);
+            $opposite  = $addToHead ? $chain[$lenC - 1]: $chain[0];
 
-            $chain = &$chains[$index];
-
-            $grow  = $addToHead ? $chain[0]               : end($chain);
-            $grow2 = $addToHead ? $chain[1]               : $chain[count($chain)-2];
-            $opposite  = $addToHead ? end($chain)         : $chain[0];
-            $opposite2 = $addToHead ? $chain[count($chain)-2] : $chain[1];
-
-            if (Point::collinear($grow2, $grow, $point)) {
-                //if (Algorithm::DEBUG) echo "     collinear(grow2,grow,point): trimming " . ($addToHead?'HEAD':'TAIL') . "\n";
-                if ($addToHead) { array_shift($chain); } else { array_pop($chain); }
-                $grow = $grow2;
-            }
-
-            if ($opposite == $point) {
-                //if (Algorithm::DEBUG) echo "     OPPOSITE==POINT: CLOSE REGION (before trim)\n";
-                array_splice($chains, $index, 1);
-
-                if (Point::collinear($opposite2, $opposite, $grow)) {
-                    //if (Algorithm::DEBUG) echo "     collinear(opposite2,opposite,grow): trimming " . ($addToHead?'TAIL':'HEAD') . "\n";
-                    if ($addToHead) { array_pop($chain); } else { array_shift($chain); }
+            // Simplificación colineal en el extremo que crece
+            if ($lenC >= 2 && Point::collinear($grow2, $grow, $point)) {
+                if ($addToHead) {
+                    $oldHeadKey = self::pointKey($chain[0]);
+                    unset($headIndex[$oldHeadKey]);
+                    array_shift($chain);
+                    $grow = $grow2;
+                    $headIndex[self::pointKey($chain[0])] = $index;
+                } else {
+                    $oldTailKey = self::pointKey($chain[$lenC - 1]);
+                    unset($tailIndex[$oldTailKey]);
+                    array_pop($chain);
+                    $grow = $grow2;
+                    $tailIndex[self::pointKey(end($chain))] = $index;
                 }
-                //if (Algorithm::DEBUG) echo "     CLOSED REGION: " . regionStr($chain) . "\n";
-                $regions[] = $chain;
+                $lenC--;
+            }
+
+            // ¿El segmento cierra la cadena?
+            if ($opposite->__eq($point)) {
+                // Capturar claves ANTES de la simplificación de cierre
+                $hkClose = self::pointKey($chain[0]);
+                $tkClose = self::pointKey(end($chain));
+                if ($lenC >= 2) {
+                    $opposite2 = $addToHead ? $chain[$lenC - 2] : $chain[1];
+                    if (Point::collinear($opposite2, $opposite, $grow)) {
+                        if ($addToHead) {
+                            array_pop($chain);
+                        } else {
+                            array_shift($chain);
+                        }
+                    }
+                }
+                unset($headIndex[$hkClose], $tailIndex[$tkClose], $chains[$index]);
+                if (count($chain) >= 3) {
+                    $regions[] = $chain;
+                }
                 continue;
             }
 
+            // Extender
             if ($addToHead) {
-                $ret = array_unshift($chain, $point);
+                $oldHKey = self::pointKey($chain[0]);
+                unset($headIndex[$oldHKey]);
+                array_unshift($chain, $point);
+                $headIndex[$pointKey] = $index;
             } else {
+                $oldTKey = self::pointKey($chain[$lenC - 1]);
+                unset($tailIndex[$oldTKey]);
                 $chain[] = $point;
+                $tailIndex[$pointKey] = $index;
             }
-            //if (Algorithm::DEBUG) echo "     chain[$index] now " . chainEndsStr($chain) . "\n";
             continue;
         }
 
-        // 2 matches: unir cadenas
-        $firstIndex  = $segmentChainerMatcher->firstMatch->index;
-        $secondIndex = $segmentChainerMatcher->secondMatch->index;
-
+        // ── Caso 2: dos matches → fusionar dos cadenas ───────────────────
+        [$firstIndex,  $firstHead ] = $firstMatch;
+        [$secondIndex, $secondHead] = $secondMatch;
         $reverseFirst = count($chains[$firstIndex]) < count($chains[$secondIndex]);
 
-        if ($segmentChainerMatcher->firstMatch->matchesHead) {
-            if ($segmentChainerMatcher->secondMatch->matchesHead) {
+        if ($firstHead) {
+            if ($secondHead) {
                 if ($reverseFirst) {
-                    //if (Algorithm::DEBUG) echo "     CASE: head + head (reverse FIRST) -> appendChain(first, second)\n";
-                    self::reverseChain($chains, $firstIndex);
-                    self::appendChain($chains, $firstIndex, $secondIndex);
+                    self::reverseChainIdx($chains, $headIndex, $tailIndex, $firstIndex);
+                    self::appendChainIdx($chains, $headIndex, $tailIndex, $firstIndex, $secondIndex);
                 } else {
-                    //if (Algorithm::DEBUG) echo "     CASE: head + head (reverse SECOND) -> appendChain(second, first)\n";
-                    self::reverseChain($chains, $secondIndex);
-                    self::appendChain($chains, $secondIndex, $firstIndex);
+                    self::reverseChainIdx($chains, $headIndex, $tailIndex, $secondIndex);
+                    self::appendChainIdx($chains, $headIndex, $tailIndex, $secondIndex, $firstIndex);
                 }
             } else {
-                //if (Algorithm::DEBUG) echo "     CASE: head + tail -> appendChain(second, first)\n";
-                self::appendChain($chains, $secondIndex, $firstIndex);
+                self::appendChainIdx($chains, $headIndex, $tailIndex, $secondIndex, $firstIndex);
             }
         } else {
-            if ($segmentChainerMatcher->secondMatch->matchesHead) {
-                //if (Algorithm::DEBUG) echo "     CASE: tail + head -> appendChain(first, second)\n";
-                self::appendChain($chains, $firstIndex, $secondIndex);
+            if ($secondHead) {
+                self::appendChainIdx($chains, $headIndex, $tailIndex, $firstIndex, $secondIndex);
             } else {
                 if ($reverseFirst) {
-                    //if (Algorithm::DEBUG) echo "     CASE: tail + tail (reverse FIRST) -> appendChain(second, first)\n";
-                    self::reverseChain($chains, $firstIndex);
-                    self::appendChain($chains, $secondIndex, $firstIndex);
+                    self::reverseChainIdx($chains, $headIndex, $tailIndex, $firstIndex);
+                    self::appendChainIdx($chains, $headIndex, $tailIndex, $secondIndex, $firstIndex);
                 } else {
-                    //if (Algorithm::DEBUG) echo "     CASE: tail + tail (reverse SECOND) -> appendChain(first, second)\n";
-                    self::reverseChain($chains, $secondIndex);
-                    self::appendChain($chains, $firstIndex, $secondIndex);
+                    self::reverseChainIdx($chains, $headIndex, $tailIndex, $secondIndex);
+                    self::appendChainIdx($chains, $headIndex, $tailIndex, $firstIndex, $secondIndex);
                 }
             }
         }
     }
+
     return $regions;
 }
+
+
+
+
+
+
 
     // core API
     public static function segments($polygon): PolySegments

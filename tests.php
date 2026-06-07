@@ -116,6 +116,15 @@ $test = [
 	    'xoring' => [[[[0,0],[2,0],[2,1],[1,1],[1,2],[0,2],[0,0]]],[[[1,2],[2,2],[2,1],[3,1],[3,3],[1,3],[1,2]]]],
 	],
     ],
+
+    12 => [ // union
+	'region_a' => [[[-60.69023,-40.8338],[-60.6874,-40.83431837489067],[-60.6873,-40.832],[-60.69023,-40.8338]]],
+	'region_b' => [[[-60.686,-40.836],[-60.6841701,-40.83491],[-60.6876,-40.83428174062278],[-60.686,-40.836]]],
+	'region_c' => [[[-60.6865,-40.8365],[-60.6855,-40.8375],[-60.6845,-40.8365],[-60.6865,-40.8365]]],
+	'res' => [
+	    'union' => [[[[-60.6865,-40.8365],[-60.6855,-40.8375],[-60.6845,-40.8365],[-60.6865,-40.8365]]],[[[-60.69023,-40.8338],[-60.6876,-40.834281740623],[-60.686,-40.836],[-60.6841701,-40.83491],[-60.6874,-40.834318374891],[-60.6873,-40.832],[-60.69023,-40.8338]]]],
+	],
+    ],
 ];
 
 /*
@@ -210,26 +219,34 @@ print "result 2#" . $result->numPoints . PHP_EOL;
 
 
 $fail = false;
-$debug = false;
+$debug = true;
 foreach( $test as $test_number => $test_predicates ) {
     $pa = MR\Polygon::create()->fillFromArray($test_predicates['region_a']);
     $pb = MR\Polygon::create()->fillFromArray($test_predicates['region_b']);
+    if ( isset ($test_predicates['region_c']) ) {
+	$pc = MR\Polygon::create()->fillFromArray($test_predicates['region_c']);
+    } else {
+	$pc = false;
+    }
 
     foreach ( $test_predicates['res'] as $op => $expected ) {
 	$diff = array();
-	$result = MR\Algorithm::$op($pa, $pb)->getArray();
-
+	$pab = MR\Algorithm::$op($pa, $pb);
+	$result = $pab->getArray();
+	if ( $pc )
+	    $result = MR\Algorithm::$op($pab, $pc)->getArray();
 	if ( $debug ) print "PA" . PHP_EOL . json_encode($test_predicates['region_a']) . PHP_EOL;
 	if ( $debug ) print "PB" . PHP_EOL . json_encode($test_predicates['region_b']) . PHP_EOL;
+	if ( $pc && $debug ) print "PC" . PHP_EOL . json_encode($test_predicates['region_c']) . PHP_EOL;
+
 	if ( $debug ) print "RE" . PHP_EOL . json_encode($expected) . PHP_EOL;
 	if ( $debug ) print "RS" . PHP_EOL . json_encode($result) . PHP_EOL . PHP_EOL;
 
 	// soporta como entrada Polygon o MultiPolygon
-	$result_normalized = MR\GJTools::geojsonToArray($result);
-	// print "RESULT NORMALIZED" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
 	$expected_normalized = MR\GJTools::geojsonToArray($expected);
-	// print "EXPECTED NORMALIZED" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
-	//exit(1);
+	if ( $debug ) print "RE_N" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
+	$result_normalized = MR\GJTools::geojsonToArray($result);
+	if ( $debug ) print "RS_N" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
 	$ret = MR\GJTools::compareCoordinates($result_normalized, $expected_normalized, $diff);
 
 	if ( $ret ) {
