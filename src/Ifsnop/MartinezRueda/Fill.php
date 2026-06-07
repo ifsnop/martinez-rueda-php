@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 // Define el espacio de nombres (namespace) donde se encuentra esta clase.
@@ -6,14 +7,16 @@ declare(strict_types=1);
 namespace Ifsnop\MartinezRueda;
 
 // Se declara una clase llamada Fill.
-final class Fill {
+final class Fill
+{
     // Se definen dos propiedades públicas: $below y $above.
     public $below;
     public $above;
 
     // Constructor de la clase, acepta dos parámetros booleanos opcionales.
     // Si no se pasan, serán null por defecto.
-    public function __construct(bool $below = null, bool $above = null) {
+    public function __construct(bool $below = null, bool $above = null)
+    {
         // Se asignan los valores recibidos a las propiedades del objeto.
         $this->below = $below;
         $this->above = $above;
@@ -21,12 +24,14 @@ final class Fill {
 
     // Método mágico __toString, se ejecuta cuando el objeto se usa como cadena.
     // Devuelve una cadena con los valores de above y below separados por coma.
-    public function __toString():string {
+    public function __toString(): string
+    {
         return "{$this->above},{$this->below}";
     }
 
     // Método mágico __debugInfo, define cómo se mostrará el objeto al hacer un var_dump.
-    public function __debugInfo():array {
+    public function __debugInfo(): array
+    {
         return ["below" => $this->below, "above" => $this->above];
     }
 }

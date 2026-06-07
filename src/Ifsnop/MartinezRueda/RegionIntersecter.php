@@ -1,14 +1,18 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-final class RegionIntersecter extends Intersecter {
-    public function __construct() {
+final class RegionIntersecter extends Intersecter
+{
+    public function __construct()
+    {
         parent::__construct(true);
     }
 
-    public function addRegion(array $region) {
+    public function addRegion(array $region)
+    {
         $point1 = null;
         $point2 = end($region);
         foreach ($region as $currentPoint) {
@@ -29,7 +33,8 @@ final class RegionIntersecter extends Intersecter {
         }
     }
 
-    public function calculate2(bool $isInverted) {
+    public function calculate2(bool $isInverted)
+    {
         return parent::calculate($isInverted, false);
     }
 }

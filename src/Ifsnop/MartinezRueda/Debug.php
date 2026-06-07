@@ -1,11 +1,13 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
 final class Debug
 {
-    public static function on(): bool {
+    public static function on(): bool
+    {
         return defined(Algorithm::class . '::DEBUG') && Algorithm::DEBUG;
     }
 
@@ -26,22 +28,24 @@ final class Debug
 
     public static function p(Point $p): string
     {
-	$px = sprintf("%.12f", self::f($p, 'x'));
-	$py = sprintf("%.12f", self::f($p, 'y'));
-	if ( false !== ( $pos = strpos($px, ".") ))
-	    while ( $px[strlen($px)-1] == '0' )
-		$px = substr($px, 0, -1);
-	if ( false !== ( $pos = strpos($py, ".") ))
-	    while ( $py[strlen($py)-1] == '0' )
-		$py = substr($py, 0, -1);
-	return sprintf("(%s, %s)", $px, $py);
+        $px = sprintf("%.12f", self::f($p, 'x'));
+        $py = sprintf("%.12f", self::f($p, 'y'));
+        if (false !== ($pos = strpos($px, ".")))
+            while ($px[strlen($px) - 1] == '0')
+                $px = substr($px, 0, -1);
+        if (false !== ($pos = strpos($py, ".")))
+            while ($py[strlen($py) - 1] == '0')
+                $py = substr($py, 0, -1);
+        return sprintf("(%s, %s)", $px, $py);
         // return sprintf("(%.12f, %.12f)", self::f($p, 'x'), self::f($p, 'y'));
     }
 
     private static function f($obj, string $prop): float
     {
         // Acceso a propiedades privadas mediante closures (solo para debug)
-        return (function () use ($prop) { return $this->$prop; })->call($obj);
+        return (function () use ($prop) {
+            return $this->$prop;
+        })->call($obj);
     }
 
     public static function segStr(?Segment $s): string
@@ -62,7 +66,9 @@ final class Debug
     private static function fillBit(?Fill $f, string $prop): string
     {
         if ($f === null) return '·';
-        $v = (function () use ($prop) { return $this->$prop; })->call($f);
+        $v = (function () use ($prop) {
+            return $this->$prop;
+        })->call($f);
         if ($v === null) return '·';
         return $v ? '1' : '0';
     }
@@ -100,7 +106,8 @@ final class Debug
         $cursor = $root->getHead();
         $i = 0;
         while ($cursor !== null) {
-            self::log("  [%02d] St%s -> %s",
+            self::log(
+                "  [%02d] St%s -> %s",
                 $i++,
                 self::pid($cursor),
                 self::evStr($cursor->ev)

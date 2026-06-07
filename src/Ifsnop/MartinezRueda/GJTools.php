@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
@@ -17,57 +18,57 @@ final class GJTools
      * @param string|array|object $geojsonSource Ruta a archivo .geojson, JSON en string o estructura ya decodificada.
      * @return array Array de polígonos: [ [ [ [x,y], ... ], [holeRing], ... ], ... ]
      * @throws InvalidArgumentException Si el JSON no es válido o el objeto no es GeoJSON válido.
-    */
+     */
     public static function geojsonToArray($geojsonSource): array
     {
-	// 1) Cargar/decodificar
-	if (is_string($geojsonSource)) {
-	    if (is_file($geojsonSource)) {
-		$json = @file_get_contents($geojsonSource);
-		if ($json === false) {
-		    throw new \InvalidArgumentException("No se pudo leer el archivo: $geojsonSource");
-		}
-	    } else {
-		// asumimos que es un string JSON
-		$json = $geojsonSource;
-	    }
-	    $root = json_decode($json, true);
-	    if ($root === null && json_last_error() !== JSON_ERROR_NONE) {
-		throw new \InvalidArgumentException("JSON inválido: " . json_last_error_msg());
-	    }
-	} elseif (is_array($geojsonSource) || is_object($geojsonSource)) {
-	    // convertir objeto stdClass a array asociativo recursivamente
-	    $root = json_decode(json_encode($geojsonSource), true);
-	} else {
-	    throw new \InvalidArgumentException("Tipo de entrada no soportado.");
-	}
+        // 1) Cargar/decodificar
+        if (is_string($geojsonSource)) {
+            if (is_file($geojsonSource)) {
+                $json = @file_get_contents($geojsonSource);
+                if ($json === false) {
+                    throw new \InvalidArgumentException("No se pudo leer el archivo: $geojsonSource");
+                }
+            } else {
+                // asumimos que es un string JSON
+                $json = $geojsonSource;
+            }
+            $root = json_decode($json, true);
+            if ($root === null && json_last_error() !== JSON_ERROR_NONE) {
+                throw new \InvalidArgumentException("JSON inválido: " . json_last_error_msg());
+            }
+        } elseif (is_array($geojsonSource) || is_object($geojsonSource)) {
+            // convertir objeto stdClass a array asociativo recursivamente
+            $root = json_decode(json_encode($geojsonSource), true);
+        } else {
+            throw new \InvalidArgumentException("Tipo de entrada no soportado.");
+        }
 
-	if (!is_array($root)) {
-	    throw new \InvalidArgumentException("GeoJSON decodificado no es un objeto/array válido.");
-	}
+        if (!is_array($root)) {
+            throw new \InvalidArgumentException("GeoJSON decodificado no es un objeto/array válido.");
+        }
 
-	// 2) Recorrer recursivamente y extraer polígonos
-	$polygons = self::extractPolygonsRec($root);
+        // 2) Recorrer recursivamente y extraer polígonos
+        $polygons = self::extractPolygonsRec($root);
 
-	// 3) Flatten
-	// necesitamos aplanar los rings para tenerlos todos seguidos
-	$polygons = self::flattenMultipolygon($polygons);
+        // 3) Flatten
+        // necesitamos aplanar los rings para tenerlos todos seguidos
+        $polygons = self::flattenMultipolygon($polygons);
 
-	// La salida de extract es siempre multipolygon!!
-	// Comprobar si el resultado es Multipolygon o Polygon
+        // La salida de extract es siempre multipolygon!!
+        // Comprobar si el resultado es Multipolygon o Polygon
 
-	// averiguar cuales son interior y cuales son exterior, teniendo en cuenta que
-	// los pares son exterior y los impares interior
-	$nodes = self::classifyRings($polygons);
-	$polygons = self::buildPolygons($nodes, $enforceOrientation = true);
+        // averiguar cuales son interior y cuales son exterior, teniendo en cuenta que
+        // los pares son exterior y los impares interior
+        $nodes = self::classifyRings($polygons);
+        $polygons = self::buildPolygons($nodes, $enforceOrientation = true);
 
-	// canonicalizePolygons 
+        // canonicalizePolygons 
         $tol = max(Algorithm::TOLERANCE, PHP_FLOAT_EPSILON);
         $digits = (int) max(0, round(-log10($tol)));
         $polygons = self::canonicalizePolygons($polygons, $digits);
 
-	// Asegurar que siempre devolvemos un array (posiblemente vacío)
-	return array_values($polygons);
+        // Asegurar que siempre devolvemos un array (posiblemente vacío)
+        return array_values($polygons);
     }
 
     /**
@@ -75,85 +76,85 @@ final class GJTools
      */
     private static function extractPolygonsRec(array $node): array
     {
-	$out = [];
+        $out = [];
 
-	if ( 0 == count($node) ) {
-	    return $out;
-	}
+        if (0 == count($node)) {
+            return $out;
+        }
 
-	// Caso raíz sin 'type' pero con 'features' (algunos exportadores)
-	if (!isset($node['type']) && isset($node['features']) && is_array($node['features'])) {
-	    foreach ($node['features'] as $feat) {
-		$out = array_merge($out, self::extractPolygonsRec($feat));
-	    }
-	    return $out;
-	}
+        // Caso raíz sin 'type' pero con 'features' (algunos exportadores)
+        if (!isset($node['type']) && isset($node['features']) && is_array($node['features'])) {
+            foreach ($node['features'] as $feat) {
+                $out = array_merge($out, self::extractPolygonsRec($feat));
+            }
+            return $out;
+        }
 
-	// nos ha llegado un array de coordenadas, calcularemos el tipo pero siempre será o
-	// Polygon o MultiPolygon
-	if ( !isset($node['type']) && !isset($node['coordinates']) ) {
-	    $new_node = [];
-	    $new_node['type'] = self::detectGeometryTypeFromCoordinatesArray($node);
-	    $new_node['coordinates'] = $node;
-	    $node = $new_node;
-	}
+        // nos ha llegado un array de coordenadas, calcularemos el tipo pero siempre será o
+        // Polygon o MultiPolygon
+        if (!isset($node['type']) && !isset($node['coordinates'])) {
+            $new_node = [];
+            $new_node['type'] = self::detectGeometryTypeFromCoordinatesArray($node);
+            $new_node['coordinates'] = $node;
+            $node = $new_node;
+        }
 
-	$type = $node['type'] ?? null;
+        $type = $node['type'] ?? null;
 
-	switch ($type) {
-	    case 'FeatureCollection':
-		if (isset($node['features']) && is_array($node['features'])) {
-		    foreach ($node['features'] as $feature) {
-			$out = array_merge($out, self::extractPolygonsRec($feature));
-		    }
-		}
-		break;
-	    case 'Feature':
-		// La geometría puede ser null
-		if (isset($node['geometry']) && is_array($node['geometry'])) {
-		    $out = array_merge($out, self::extractPolygonsRec($node['geometry']));
-		}
-		break;
+        switch ($type) {
+            case 'FeatureCollection':
+                if (isset($node['features']) && is_array($node['features'])) {
+                    foreach ($node['features'] as $feature) {
+                        $out = array_merge($out, self::extractPolygonsRec($feature));
+                    }
+                }
+                break;
+            case 'Feature':
+                // La geometría puede ser null
+                if (isset($node['geometry']) && is_array($node['geometry'])) {
+                    $out = array_merge($out, self::extractPolygonsRec($node['geometry']));
+                }
+                break;
 
-	    case 'GeometryCollection':
-		if (isset($node['geometries']) && is_array($node['geometries'])) {
-		    foreach ($node['geometries'] as $geom) {
-			if (is_array($geom)) {
-			    $out = array_merge($out, self::extractPolygonsRec($geom));
-			}
-		    }
-		}
-		break;
+            case 'GeometryCollection':
+                if (isset($node['geometries']) && is_array($node['geometries'])) {
+                    foreach ($node['geometries'] as $geom) {
+                        if (is_array($geom)) {
+                            $out = array_merge($out, self::extractPolygonsRec($geom));
+                        }
+                    }
+                }
+                break;
 
-	    case 'Polygon':
-		if (isset($node['coordinates']) && is_array($node['coordinates'])) {
-		    $poly = self::normalizePolygon($node['coordinates']);
-		    if (!empty($poly)) {
-			$out[] = $poly;
-		    }
-		}
-		break;
+            case 'Polygon':
+                if (isset($node['coordinates']) && is_array($node['coordinates'])) {
+                    $poly = self::normalizePolygon($node['coordinates']);
+                    if (!empty($poly)) {
+                        $out[] = $poly;
+                    }
+                }
+                break;
 
-	    case 'MultiPolygon':
-		if (isset($node['coordinates']) && is_array($node['coordinates'])) {
-		    foreach ($node['coordinates'] as $polyCoords) {
-			if (is_array($polyCoords)) {
-			    $poly = self::normalizePolygon($polyCoords);
-			    if (!empty($poly)) {
-			        $out[] = $poly;
-			    }
-			}
-		    }
-		}
-		break;
+            case 'MultiPolygon':
+                if (isset($node['coordinates']) && is_array($node['coordinates'])) {
+                    foreach ($node['coordinates'] as $polyCoords) {
+                        if (is_array($polyCoords)) {
+                            $poly = self::normalizePolygon($polyCoords);
+                            if (!empty($poly)) {
+                                $out[] = $poly;
+                            }
+                        }
+                    }
+                }
+                break;
 
-	    // Otros tipos se ignoran: Point, MultiPoint, LineString, MultiLineString
-	    default:
-		// Ignorar silenciosamente
-		break;
-	}
+            // Otros tipos se ignoran: Point, MultiPoint, LineString, MultiLineString
+            default:
+                // Ignorar silenciosamente
+                break;
+        }
 
-	return $out;
+        return $out;
     }
 
     /**
@@ -169,49 +170,49 @@ final class GJTools
      */
     private static function normalizePolygon(array $coords): array
     {
-	$rings = [];
+        $rings = [];
 
-	foreach ($coords as $ringIdx => $ringCoords) {
-	    if (!is_array($ringCoords)) {
-		continue;
-	    }
+        foreach ($coords as $ringIdx => $ringCoords) {
+            if (!is_array($ringCoords)) {
+                continue;
+            }
 
-	    $ring = [];
+            $ring = [];
 
-	    foreach ($ringCoords as $pt) {
-		if (!is_array($pt) || count($pt) < 2) {
-		    continue;
-		}
-		$x = $pt[0];
-		$y = $pt[1];
+            foreach ($ringCoords as $pt) {
+                if (!is_array($pt) || count($pt) < 2) {
+                    continue;
+                }
+                $x = $pt[0];
+                $y = $pt[1];
 
-		// Validar numéricos
-		if (!is_numeric($x) || !is_numeric($y)) {
-		    continue;
-		}
+                // Validar numéricos
+                if (!is_numeric($x) || !is_numeric($y)) {
+                    continue;
+                }
 
-		$ring[] = [floatval($x), floatval($y)];
-	    }
+                $ring[] = [floatval($x), floatval($y)];
+            }
 
-	    // Un anillo válido necesita al menos 4 puntos en GeoJSON (incl. cierre).
-	    // Como removimos el cierre duplicado, exigimos >= 3 puntos distintos (triángulo).
-	    if (count($ring) < 3) {
-		// anillo degenerado → ignorar
-		throw new \InvalidArgumentException("Anillo degenerado count(ring)<3.");
-	    }
+            // Un anillo válido necesita al menos 4 puntos en GeoJSON (incl. cierre).
+            // Como removimos el cierre duplicado, exigimos >= 3 puntos distintos (triángulo).
+            if (count($ring) < 3) {
+                // anillo degenerado → ignorar
+                throw new \InvalidArgumentException("Anillo degenerado count(ring)<3.");
+            }
 
 
-	    $ring = self::dedupConsecutive($ring);
-	    $ring = self::removeColinearPointsFromPolygon($ring);
-	    $ring = self::closeRing($ring);
+            $ring = self::dedupConsecutive($ring);
+            $ring = self::removeColinearPointsFromPolygon($ring);
+            $ring = self::closeRing($ring);
 
-	    $rings[] = $ring;
-	}
+            $rings[] = $ring;
+        }
 
-	if (empty($rings)) {
-	    return [];
-	}
-	return $rings;
+        if (empty($rings)) {
+            return [];
+        }
+        return $rings;
     }
 
     /**
@@ -219,17 +220,17 @@ final class GJTools
      * @param array $polygons
      * @return array
      */
-     private static function flattenMultipolygon(array $polygons): array
-     {
-	$rings = [];
+    private static function flattenMultipolygon(array $polygons): array
+    {
+        $rings = [];
 
-	foreach ($polygons as $polygon) {
-	    foreach ($polygon as $ring) {
-		$rings[] = $ring;
+        foreach ($polygons as $polygon) {
+            foreach ($polygon as $ring) {
+                $rings[] = $ring;
             }
-	}
-	return $rings;
-     }
+        }
+        return $rings;
+    }
 
     /**
      * Asegura que el anillo esté cerrado (primer punto == último).
@@ -250,54 +251,62 @@ final class GJTools
         return $ring;
     }
 
-    public static function almostEq(float $a, float $b): bool {
-	return abs($a-$b) <= Algorithm::TOLERANCE;
+    public static function almostEq(float $a, float $b): bool
+    {
+        return abs($a - $b) <= Algorithm::TOLERANCE;
     }
 
-    private static function dedupConsecutive(array $ring): array {
+    private static function dedupConsecutive(array $ring): array
+    {
         $out = [];
         foreach ($ring as $p) {
-            if (empty($out)) { $out[] = $p; continue; }
-            $q = $out[count($out)-1];
-            if (!(self::almostEq($p[0],$q[0]) && self::almostEq($p[1],$q[1]))) $out[] = $p;
+            if (empty($out)) {
+                $out[] = $p;
+                continue;
+            }
+            $q = $out[count($out) - 1];
+            if (!(self::almostEq($p[0], $q[0]) && self::almostEq($p[1], $q[1]))) $out[] = $p;
         }
         return $out;
     }
 
-    public static function removeColinearPointsFromPolygon($polygonCoords):array
+    public static function removeColinearPointsFromPolygon($polygonCoords): array
     {
-	// Asegura que el anillo esté cerrado
-	if ($polygonCoords[0] !== end($polygonCoords)) {
-	    $polygonCoords[] = $polygonCoords[0];
-	}
+        // Asegura que el anillo esté cerrado
+        if ($polygonCoords[0] !== end($polygonCoords)) {
+            $polygonCoords[] = $polygonCoords[0];
+        }
 
-	$cleaned = [];
-	$n = count($polygonCoords);
+        $cleaned = [];
+        $n = count($polygonCoords);
 
-	// Recorre todos los puntos, excepto el último (que es igual al primero)
-	for ($i = 0; $i < $n - 2; $i++) {
-	    $a = $polygonCoords[$i];
-	    $b = $polygonCoords[$i + 1];
-	    $c = $polygonCoords[$i + 2];
+        // Recorre todos los puntos, excepto el último (que es igual al primero)
+        for ($i = 0; $i < $n - 2; $i++) {
+            $a = $polygonCoords[$i];
+            $b = $polygonCoords[$i + 1];
+            $c = $polygonCoords[$i + 2];
 
-	    $x1 = $a[0]; $y1 = $a[1];
-	    $x2 = $b[0]; $y2 = $b[1];
-	    $x3 = $c[0]; $y3 = $c[1];
+            $x1 = $a[0];
+            $y1 = $a[1];
+            $x2 = $b[0];
+            $y2 = $b[1];
+            $x3 = $c[0];
+            $y3 = $c[1];
 
-	    // Calcula el área del triángulo (doble)
-	    $area = abs(($x2 - $x1) * ($y3 - $y1) - ($y2 - $y1) * ($x3 - $x1));
+            // Calcula el área del triángulo (doble)
+            $area = abs(($x2 - $x1) * ($y3 - $y1) - ($y2 - $y1) * ($x3 - $x1));
 
-	    // Si el área es mayor que epsilon, B no es colineal
-	    if ($area > Algorithm::TOLERANCE) {
-		$cleaned[] = $a;
-	    }
-	}
+            // Si el área es mayor que epsilon, B no es colineal
+            if ($area > Algorithm::TOLERANCE) {
+                $cleaned[] = $a;
+            }
+        }
 
-	// Añade el penúltimo punto y el cierre
-	$cleaned[] = $polygonCoords[$n - 2];
-	$cleaned[] = $cleaned[0];
+        // Añade el penúltimo punto y el cierre
+        $cleaned[] = $polygonCoords[$n - 2];
+        $cleaned[] = $cleaned[0];
 
-	return $cleaned;
+        return $cleaned;
     }
 
     /*
@@ -314,7 +323,7 @@ final class GJTools
             // Canonizar exterior y huecos
             $ext = self::ringCanonical($poly[0], $precision);
             $holes = [];
-	    $npoly = count($poly);
+            $npoly = count($poly);
             for ($i = 1; $i < $npoly; $i++) {
                 $holes[] = self::ringCanonical($poly[$i], $precision);
             }
@@ -386,8 +395,8 @@ final class GJTools
     /** Clave de polígono: exterior + '|' + claves de huecos */
     private static function polygonKey(array $polygon, ?int $precision): string
     {
-        $parts = [ self::ringKey($polygon[0], $precision) ];
-	$npolygon = count($polygon);
+        $parts = [self::ringKey($polygon[0], $precision)];
+        $npolygon = count($polygon);
         for ($i = 1; $i < $npolygon; $i++) {
             $parts[] = self::ringKey($polygon[$i], $precision);
         }
@@ -409,7 +418,7 @@ final class GJTools
     {
         $out = [];
         foreach ($ring as $pt) {
-            $out[] = [ round($pt[0], $precision), round($pt[1], $precision) ];
+            $out[] = [round($pt[0], $precision), round($pt[1], $precision)];
         }
         return $out;
     }
@@ -426,28 +435,28 @@ final class GJTools
      */
     public static function detectGeometryTypeFromCoordinatesString(string $coordinatesJson): string
     {
-	$coords = json_decode(trim($coordinatesJson), true);
-	if ($coords === null && json_last_error() !== JSON_ERROR_NONE) {
-	    throw new InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
-	}
-	if (!is_array($coords)) {
-	    throw new InvalidArgumentException("coordinates debe decodificar a un array.");
-	}
-	if (empty($coords)) {
-	    throw new InvalidArgumentException("coordinates no puede estar vacío.");
-	}
+        $coords = json_decode(trim($coordinatesJson), true);
+        if ($coords === null && json_last_error() !== JSON_ERROR_NONE) {
+            throw new InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
+        }
+        if (!is_array($coords)) {
+            throw new InvalidArgumentException("coordinates debe decodificar a un array.");
+        }
+        if (empty($coords)) {
+            throw new InvalidArgumentException("coordinates no puede estar vacío.");
+        }
 
-	// 1) Validación estructural primero (más fiable)
-	if (self::isPolygonCoordinates($coords)) {
-	    return 'Polygon';
-	}
-	if (self::isMultiPolygonCoordinates($coords)) {
-	    return 'MultiPolygon';
-	}
+        // 1) Validación estructural primero (más fiable)
+        if (self::isPolygonCoordinates($coords)) {
+            return 'Polygon';
+        }
+        if (self::isMultiPolygonCoordinates($coords)) {
+            return 'MultiPolygon';
+        }
 
-	throw new InvalidArgumentException(
-	    "La estructura de 'coordinates' no corresponde a Polygon ni MultiPolygon."
-	);
+        throw new InvalidArgumentException(
+            "La estructura de 'coordinates' no corresponde a Polygon ni MultiPolygon."
+        );
     }
 
     /**
@@ -460,72 +469,72 @@ final class GJTools
      */
     public static function detectGeometryTypeFromCoordinatesArray(array $coords): string
     {
-	//if ($coords === null && json_last_error() !== JSON_ERROR_NONE) {
-	//    throw new InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
-	//}
-	if (!is_array($coords)) {
-	    throw new InvalidArgumentException("coordinates debe decodificar a un array.");
-	}
-	if (empty($coords)) {
-	    throw new InvalidArgumentException("coordinates no puede estar vacío.");
-	}
+        //if ($coords === null && json_last_error() !== JSON_ERROR_NONE) {
+        //    throw new InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
+        //}
+        if (!is_array($coords)) {
+            throw new InvalidArgumentException("coordinates debe decodificar a un array.");
+        }
+        if (empty($coords)) {
+            throw new InvalidArgumentException("coordinates no puede estar vacío.");
+        }
 
-	// 1) Validación estructural primero (más fiable)
-	if (self::isPolygonCoordinates($coords)) {
-	    return 'Polygon';
-	}
-	if (self::isMultiPolygonCoordinates($coords)) {
-	    return 'MultiPolygon';
-	}
+        // 1) Validación estructural primero (más fiable)
+        if (self::isPolygonCoordinates($coords)) {
+            return 'Polygon';
+        }
+        if (self::isMultiPolygonCoordinates($coords)) {
+            return 'MultiPolygon';
+        }
 
-	throw new InvalidArgumentException(
-	    "La estructura de 'coordinates' no corresponde a Polygon ni MultiPolygon."
-	);
+        throw new InvalidArgumentException(
+            "La estructura de 'coordinates' no corresponde a Polygon ni MultiPolygon."
+        );
     }
 
     /** Heurística: ¿parece array de rings (cada uno array de positions)? */
     private static function isPolygonCoordinates($coords): bool
     {
-	if (!is_array($coords) || empty($coords)) return false;
-	// Debe haber al menos un ring que contenga alguna posición [x,y]
-	foreach ($coords as $ring) {
-	    if (is_array($ring) && !empty($ring)) {
-		// ¿contiene alguna position?
-		foreach ($ring as $pos) {
-		    if (self::looksLikePosition($pos)) {
-			return true;
-		    }
-		}
-	    }
-	}
-	return false;
+        if (!is_array($coords) || empty($coords)) return false;
+        // Debe haber al menos un ring que contenga alguna posición [x,y]
+        foreach ($coords as $ring) {
+            if (is_array($ring) && !empty($ring)) {
+                // ¿contiene alguna position?
+                foreach ($ring as $pos) {
+                    if (self::looksLikePosition($pos)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** Heurística: ¿parece array de polígonos, cada uno con rings que contienen positions? */
     private static function isMultiPolygonCoordinates($coords): bool
     {
-	if (!is_array($coords) || empty($coords)) return false;
-	foreach ($coords as $poly) {
-	    if (!is_array($poly) || empty($poly)) continue;
-	    foreach ($poly as $ring) {
-	        if (is_array($ring)) {
-		    foreach ($ring as $pos) {
-			if (self::looksLikePosition($pos)) {
-			    return true;
-			}
-		    }
-		}
-	    }
-	}
-	return false;
+        if (!is_array($coords) || empty($coords)) return false;
+        foreach ($coords as $poly) {
+            if (!is_array($poly) || empty($poly)) continue;
+            foreach ($poly as $ring) {
+                if (is_array($ring)) {
+                    foreach ($ring as $pos) {
+                        if (self::looksLikePosition($pos)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** Devuelve true si $arr tiene pinta de posición [x,y(,z...)] */
     private static function looksLikePosition($arr): bool
     {
-	if (!is_array($arr) || count($arr) < 2) return false;
-	// Los dos primeros deben ser numéricos
-	return is_numeric($arr[0]) && is_numeric($arr[1]);
+        if (!is_array($arr) || count($arr) < 2) return false;
+        // Los dos primeros deben ser numéricos
+        return is_numeric($arr[0]) && is_numeric($arr[1]);
     }
 
     /**
@@ -537,16 +546,16 @@ final class GJTools
      */
     public static function buildGeometryFromCoordinates($coordinatesJson): array
     {
-	if ( is_array($coordinatesJson) ) {
-	    $type = self::detectGeometryTypeFromCoordinatesArray($coordinatesJson);
-	} else {
-	    $type = self::detectGeometryTypeFromCoordinatesString($coordinatesJson);
-	}
-	$coords = json_decode(trim($coordinatesJson), true);
-	return [
-	    'type' => $type,
-	    'coordinates' => $coords,
-	];
+        if (is_array($coordinatesJson)) {
+            $type = self::detectGeometryTypeFromCoordinatesArray($coordinatesJson);
+        } else {
+            $type = self::detectGeometryTypeFromCoordinatesString($coordinatesJson);
+        }
+        $coords = json_decode(trim($coordinatesJson), true);
+        return [
+            'type' => $type,
+            'coordinates' => $coords,
+        ];
     }
 
     /**
@@ -598,22 +607,30 @@ final class GJTools
 
                 // Punto a punto
                 for ($k = 0; $k < $pa; $k++) {
-                    $ax = (float)$ringA[$k][0]; $ay = (float)$ringA[$k][1];
-                    $bx = (float)$ringB[$k][0]; $by = (float)$ringB[$k][1];
+                    $ax = (float)$ringA[$k][0];
+                    $ay = (float)$ringA[$k][1];
+                    $bx = (float)$ringB[$k][0];
+                    $by = (float)$ringB[$k][1];
 
                     if (!self::almostEq($ax, $bx)) {
                         $diff = [
                             'where'   => 'point_x',
-                            'polygon' => $p, 'ring' => $r, 'point' => $k,
-                            'a' => $ax, 'b' => $bx
+                            'polygon' => $p,
+                            'ring' => $r,
+                            'point' => $k,
+                            'a' => $ax,
+                            'b' => $bx
                         ];
                         return false;
                     }
                     if (!self::almostEq($ay, $by)) {
                         $diff = [
                             'where'   => 'point_y',
-                            'polygon' => $p, 'ring' => $r, 'point' => $k,
-                            'a' => $ay, 'b' => $by
+                            'polygon' => $p,
+                            'ring' => $r,
+                            'point' => $k,
+                            'a' => $ay,
+                            'b' => $by
                         ];
                         return false;
                     }
@@ -809,7 +826,8 @@ final class GJTools
         $minx = $miny = INF;
         $maxx = $maxy = -INF;
         foreach ($ring as $pt) {
-            $x = $pt[0]; $y = $pt[1];
+            $x = $pt[0];
+            $y = $pt[1];
             if ($x < $minx) $minx = $x;
             if ($y < $miny) $miny = $y;
             if ($x > $maxx) $maxx = $x;
@@ -832,8 +850,10 @@ final class GJTools
         if ($n < 4) return 0.0; // mínimo 3 puntos + cierre
         $sum = 0.0;
         for ($i = 0; $i < $n - 1; $i++) {
-            $x1 = $ring[$i][0];   $y1 = $ring[$i][1];
-            $x2 = $ring[$i+1][0]; $y2 = $ring[$i+1][1];
+            $x1 = $ring[$i][0];
+            $y1 = $ring[$i][1];
+            $x2 = $ring[$i + 1][0];
+            $y2 = $ring[$i + 1][1];
             $sum += ($x1 * $y2 - $x2 * $y1);
         }
         return 0.5 * $sum; // CCW positivo
@@ -848,12 +868,15 @@ final class GJTools
         if ($A == 0.0) {
             return $ring[0];
         }
-        $cx = 0.0; $cy = 0.0;
+        $cx = 0.0;
+        $cy = 0.0;
         $n = count($ring);
         $factor = 0.0;
         for ($i = 0; $i < $n - 1; $i++) {
-            $x1 = $ring[$i][0];   $y1 = $ring[$i][1];
-            $x2 = $ring[$i+1][0]; $y2 = $ring[$i+1][1];
+            $x1 = $ring[$i][0];
+            $y1 = $ring[$i][1];
+            $x2 = $ring[$i + 1][0];
+            $y2 = $ring[$i + 1][1];
             $cross = ($x1 * $y2 - $x2 * $y1);
             $cx += ($x1 + $x2) * $cross;
             $cy += ($y1 + $y2) * $cross;
@@ -870,12 +893,15 @@ final class GJTools
      */
     private static function pointInRing(array $pt, array $ring): bool
     {
-        $x = $pt[0]; $y = $pt[1];
+        $x = $pt[0];
+        $y = $pt[1];
         $inside = false;
         $n = count($ring);
         for ($i = 0, $j = $n - 1; $i < $n; $j = $i++) {
-            $xi = $ring[$i][0]; $yi = $ring[$i][1];
-            $xj = $ring[$j][0]; $yj = $ring[$j][1];
+            $xi = $ring[$i][0];
+            $yi = $ring[$i][1];
+            $xj = $ring[$j][0];
+            $yj = $ring[$j][1];
 
             // Chequeo rápido de punto sobre segmento (opcional)
             if (self::pointOnSegment($pt, [$xj, $yj], [$xi, $yi])) {
@@ -883,7 +909,7 @@ final class GJTools
             }
 
             $intersect = (($yi > $y) != ($yj > $y)) &&
-                         ($x < ($xj - $xi) * ($y - $yi) / (($yj - $yi) ?: 1e-30) + $xi);
+                ($x < ($xj - $xi) * ($y - $yi) / (($yj - $yi) ?: 1e-30) + $xi);
             if ($intersect) $inside = !$inside;
         }
         return $inside;
@@ -891,11 +917,11 @@ final class GJTools
 
     private static function pointOnSegment(array $p, array $a, array $b, float $eps = 1e-12): bool
     {
-        $cross = ($b[0]-$a[0])*($p[1]-$a[1]) - ($b[1]-$a[1])*($p[0]-$a[0]);
+        $cross = ($b[0] - $a[0]) * ($p[1] - $a[1]) - ($b[1] - $a[1]) * ($p[0] - $a[0]);
         if (abs($cross) > $eps) return false;
-        $dot = ($p[0]-$a[0])*($b[0]-$a[0]) + ($p[1]-$a[1])*($b[1]-$a[1]);
+        $dot = ($p[0] - $a[0]) * ($b[0] - $a[0]) + ($p[1] - $a[1]) * ($b[1] - $a[1]);
         if ($dot < -$eps) return false;
-        $sqLen = ($b[0]-$a[0])**2 + ($b[1]-$a[1])**2;
+        $sqLen = ($b[0] - $a[0]) ** 2 + ($b[1] - $a[1]) ** 2;
         if ($dot - $sqLen > $eps) return false;
         return true;
     }
@@ -914,5 +940,4 @@ final class GJTools
     {
         return (self::signedArea($ring) <= 0) ? $ring : array_reverse($ring);
     }
-
 }

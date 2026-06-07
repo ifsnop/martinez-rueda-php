@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
@@ -6,24 +7,19 @@ namespace Ifsnop\MartinezRueda;
 /* ===========================================================================
  *  StatusList  ->  estado del barrido (skip list ordenado con vecinos)
  * ========================================================================= */
+
 final class StatusList
 {
     use SkipListCore;
 
-    /** @var array<int,true> set de membresía para exists() */
-    // private array $exists = [];
-
-    public function __construct() { $this->initSkip(); }
+    public function __construct()
+    {
+        $this->initSkip();
+    }
 
     public function exists(?Node $node): bool
     {
-	return $node !== null && $node->inStatus; // isset($this->exists[\spl_object_id($node)]);
-/*
-        if ($node === null) {
-            return false;
-        }
-        return isset($this->exists[\spl_object_id($node)]);
-*/
+        return $node !== null && $node->inStatus; // isset($this->exists[\spl_object_id($node)]);
     }
 
     /**
@@ -35,17 +31,6 @@ final class StatusList
     {
         $data->previous = null;
         $data->next     = null;
-/*        $data->remove   = static function () use ($data) {
-            if ($data->previous === null && $data->next === null) {
-                return;
-            }
-            $prev = $data->previous;
-            $next = $data->next;
-            if ($prev !== null) $prev->next     = $next;
-            if ($next !== null) $next->previous = $prev;
-            $data->previous = $data->next = null;
-        };
-*/
         return $data;
     }
 

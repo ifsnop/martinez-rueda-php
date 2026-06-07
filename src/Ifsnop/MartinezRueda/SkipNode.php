@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
@@ -7,6 +8,7 @@ namespace Ifsnop\MartinezRueda;
  *  Nodo interno del skip list (torre de punteros).
  *  No se toca la clase Node del dominio: la torre vive aquí dentro.
  * ------------------------------------------------------------------------- */
+
 final class SkipNode
 {
     public ?Node $value;
@@ -24,5 +26,3 @@ final class SkipNode
         $this->prev   = array_fill(0, $height, null);
     }
 }
-
-

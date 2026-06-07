@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
@@ -7,6 +8,7 @@ namespace Ifsnop\MartinezRueda;
  *  Mecánica común del skip list doblemente enlazado.
  *  Las subclases sólo aportan su comparador de orden.
  * ------------------------------------------------------------------------- */
+
 trait SkipListCore
 {
     private SkipNode $header;
@@ -21,15 +23,16 @@ trait SkipListCore
     }
 
     /** Altura aleatoria con p = 1/2 (skip list clásico). */
-private function randomLevel(): int {
-    $r   = mt_rand();
-    $lvl = 1;
-    while ($lvl < $this->maxLevel && ($r & 1)) {
-        $r >>= 1;
-        $lvl++;
+    private function randomLevel(): int
+    {
+        $r   = mt_rand();
+        $lvl = 1;
+        while ($lvl < $this->maxLevel && ($r & 1)) {
+            $r >>= 1;
+            $lvl++;
+        }
+        return $lvl;
     }
-    return $lvl;
-}
 
     /**
      * Inserta $value justo después de los predecesores $update[i] de cada

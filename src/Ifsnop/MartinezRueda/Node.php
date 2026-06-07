@@ -1,9 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-final class Node {
+final class Node
+{
     public $status;
     public $other;
     public $ev;
@@ -42,4 +44,3 @@ final class Node {
         $this->primary = $primary;
     }
 }
-

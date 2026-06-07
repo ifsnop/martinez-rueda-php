@@ -1,502 +1,500 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-final class Algorithm {
+final class Algorithm
+{
     public const TOLERANCE = 1e-12; //12; //9;
     public const DEBUG = false;
 
-private static function pointKey(Point $p): string
-{
-    $inv = 1.0 / Algorithm::TOLERANCE;
-    return (int)round($p->x * $inv) . ',' . (int)round($p->y * $inv);
-}
-
-private static function reverseChainIdx(
-    array &$chains,
-    array &$headIndex,
-    array &$tailIndex,
-    int $id
-): void {
-    $oldHeadKey = self::pointKey($chains[$id][0]);
-    $oldTailKey = self::pointKey(end($chains[$id]));
-    $chains[$id] = array_reverse($chains[$id]);
-    unset($headIndex[$oldHeadKey], $tailIndex[$oldTailKey]);
-    $headIndex[$oldTailKey] = $id;
-    $tailIndex[$oldHeadKey] = $id;
-}
-
-private static function appendChainIdx(
-    array &$chains,
-    array &$headIndex,
-    array &$tailIndex,
-    int $id1,
-    int $id2
-): void {
-    if (!isset($chains[$id1], $chains[$id2])) {
-        return;
+    private static function pointKey(Point $p): string
+    {
+        $inv = 1.0 / Algorithm::TOLERANCE;
+        return (int)round($p->x * $inv) . ',' . (int)round($p->y * $inv);
     }
-    $chain1 = &$chains[$id1];
-    $chain2 = &$chains[$id2];
-    $lenC1  = count($chain1);
-    $lenC2  = count($chain2);
-    // Capturar claves externas ANTES de cualquier modificación
-    $headKey2Ext = self::pointKey($chain2[0]);
-    $tailKey2Ext = self::pointKey($chain2[$lenC2 - 1]);
-    $tailKey1Ext = self::pointKey($chain1[$lenC1 - 1]);
-    // Simplificación colineal en el punto de empalme
-    $tail = $chain1[$lenC1 - 1];
-    $head = $chain2[0];
-    if ($lenC1 >= 2) {
-        $tail2 = $chain1[$lenC1 - 2];
-        if (Point::collinear($tail2, $tail, $head)) {
-            array_pop($chain1);
-            $tail = $tail2;
+
+    private static function reverseChainIdx(
+        array &$chains,
+        array &$headIndex,
+        array &$tailIndex,
+        int $id
+    ): void {
+        $oldHeadKey = self::pointKey($chains[$id][0]);
+        $oldTailKey = self::pointKey(end($chains[$id]));
+        $chains[$id] = array_reverse($chains[$id]);
+        unset($headIndex[$oldHeadKey], $tailIndex[$oldTailKey]);
+        $headIndex[$oldTailKey] = $id;
+        $tailIndex[$oldHeadKey] = $id;
+    }
+
+    private static function appendChainIdx(
+        array &$chains,
+        array &$headIndex,
+        array &$tailIndex,
+        int $id1,
+        int $id2
+    ): void {
+        if (!isset($chains[$id1], $chains[$id2])) {
+            return;
         }
-    }
-    if ($lenC2 >= 2) {
-        $head2 = $chain2[1];
-        if (Point::collinear($tail, $head, $head2)) {
-            array_shift($chain2);
-        }
-    }
-    // Actualizar índices
-    unset($tailIndex[$tailKey1Ext], $headIndex[$headKey2Ext]);
-    unset($tailIndex[$tailKey2Ext]);
-    // Fusionar chain1 ← chain2
-    $chains[$id1] = array_merge($chain1, $chain2);
-    $tailIndex[$tailKey2Ext] = $id1;
-    // Eliminar chain2 en O(1)
-    unset($chains[$id2]);
-}
-
-
-private static function makePolySegments(array $segments, bool $isInverted): PolySegments
-{
-    return new PolySegments(
-        segments: $segments,
-        isInverted: $isInverted,
-        bounds: self::segmentsBounds($segments)
-    );
-}
-
-private static function emptyPolySegments(bool $isInverted = false): PolySegments
-{
-    return new PolySegments([], $isInverted, null);
-}
-
-private static function segmentsBounds(array $segments): ?array
-{
-    if (empty($segments)) {
-        return null;
-    }
-
-    $minX = INF;
-    $minY = INF;
-    $maxX = -INF;
-    $maxY = -INF;
-
-    foreach ($segments as $s) {
-        if ($s->minX < $minX) $minX = $s->minX;
-        if ($s->minY < $minY) $minY = $s->minY;
-        if ($s->maxX > $maxX) $maxX = $s->maxX;
-        if ($s->maxY > $maxY) $maxY = $s->maxY;
-    }
-
-    return [$minX, $minY, $maxX, $maxY];
-}
-
-private static function boundsOverlap(?array $a, ?array $b): bool
-{
-    if ($a === null || $b === null) {
-        return false;
-    }
-
-    return !(
-        $a[2] < $b[0] ||
-        $b[2] < $a[0] ||
-        $a[3] < $b[1] ||
-        $b[3] < $a[1]
-    );
-}
-
-private static function mergeBounds(?array $a, ?array $b): ?array
-{
-    if ($a === null) return $b;
-    if ($b === null) return $a;
-
-    return [
-        min($a[0], $b[0]),
-        min($a[1], $b[1]),
-        max($a[2], $b[2]),
-        max($a[3], $b[3]),
-    ];
-}
-
-public static function segmentChainer(array $segments): array
-{
-    $regions   = [];
-    $chains    = [];   // id => Point[]
-    $headIndex = [];   // pointKey => chain id
-    $tailIndex = [];   // pointKey => chain id
-    $nextId    = 0;
-
-    foreach ($segments as $segment) {
-        $point1 = $segment->start;
-        $point2 = $segment->end;
-        if ($point1->__eq($point2)) {
-            continue;
-        }
-        $key1 = self::pointKey($point1);
-        $key2 = self::pointKey($point2);
-
-        // Lookup O(1)
-        $matchId1Head = $headIndex[$key1] ?? null;  // head == point1
-        $matchId1Tail = $tailIndex[$key1] ?? null;  // tail == point1
-        $matchId2Head = $headIndex[$key2] ?? null;  // head == point2
-        $matchId2Tail = $tailIndex[$key2] ?? null;  // tail == point2
-
-        // Construir candidatos en el mismo orden de prioridad que el original:
-        // head==pt1, head==pt2, tail==pt1, tail==pt2
-        $candidates = [];
-        if ($matchId1Head !== null) $candidates[] = [$matchId1Head, true,  true];
-        if ($matchId2Head !== null) $candidates[] = [$matchId2Head, true,  false];
-        if ($matchId1Tail !== null) $candidates[] = [$matchId1Tail, false, true];
-        if ($matchId2Tail !== null) $candidates[] = [$matchId2Tail, false, false];
-
-        // Deduplicar por id y tomar los dos primeros
-        $firstMatch  = null;
-        $secondMatch = null;
-        $seen = [];
-        foreach ($candidates as [$cid, $cHead, $cPt1]) {
-            if (isset($seen[$cid])) continue;
-            $seen[$cid] = true;
-            if ($firstMatch === null) {
-                $firstMatch = [$cid, $cHead, $cPt1];
-            } else {
-                $secondMatch = [$cid, $cHead, $cPt1];
-                break;
+        $chain1 = &$chains[$id1];
+        $chain2 = &$chains[$id2];
+        $lenC1  = count($chain1);
+        $lenC2  = count($chain2);
+        // Capturar claves externas ANTES de cualquier modificación
+        $headKey2Ext = self::pointKey($chain2[0]);
+        $tailKey2Ext = self::pointKey($chain2[$lenC2 - 1]);
+        $tailKey1Ext = self::pointKey($chain1[$lenC1 - 1]);
+        // Simplificación colineal en el punto de empalme
+        $tail = $chain1[$lenC1 - 1];
+        $head = $chain2[0];
+        if ($lenC1 >= 2) {
+            $tail2 = $chain1[$lenC1 - 2];
+            if (Point::collinear($tail2, $tail, $head)) {
+                array_pop($chain1);
+                $tail = $tail2;
             }
         }
+        if ($lenC2 >= 2) {
+            $head2 = $chain2[1];
+            if (Point::collinear($tail, $head, $head2)) {
+                array_shift($chain2);
+            }
+        }
+        // Actualizar índices
+        unset($tailIndex[$tailKey1Ext], $headIndex[$headKey2Ext]);
+        unset($tailIndex[$tailKey2Ext]);
+        // Fusionar chain1 ← chain2
+        $chains[$id1] = array_merge($chain1, $chain2);
+        $tailIndex[$tailKey2Ext] = $id1;
+        // Eliminar chain2 en O(1)
+        unset($chains[$id2]);
+    }
 
-        // El original itera cadenas por ID creciente → menor ID = firstMatch.
-        // Normalizar para garantizar topología idéntica al original.
-        if ($firstMatch !== null && $secondMatch !== null
-            && $firstMatch[0] > $secondMatch[0])
-        {
-            [$firstMatch, $secondMatch] = [$secondMatch, $firstMatch];
+
+    private static function makePolySegments(array $segments, bool $isInverted): PolySegments
+    {
+        return new PolySegments(
+            segments: $segments,
+            isInverted: $isInverted,
+            bounds: self::segmentsBounds($segments)
+        );
+    }
+
+    private static function emptyPolySegments(bool $isInverted = false): PolySegments
+    {
+        return new PolySegments([], $isInverted, null);
+    }
+
+    private static function segmentsBounds(array $segments): ?array
+    {
+        if (empty($segments)) {
+            return null;
         }
 
-        // ── Caso 0: sin match → nueva cadena ─────────────────────────────
-        if ($firstMatch === null) {
-            $id = $nextId++;
-            $chains[$id]      = [$point1, $point2];
-            $headIndex[$key1] = $id;
-            $tailIndex[$key2] = $id;
-            continue;
+        $minX = INF;
+        $minY = INF;
+        $maxX = -INF;
+        $maxY = -INF;
+
+        foreach ($segments as $s) {
+            if ($s->minX < $minX) $minX = $s->minX;
+            if ($s->minY < $minY) $minY = $s->minY;
+            if ($s->maxX > $maxX) $maxX = $s->maxX;
+            if ($s->maxY > $maxY) $maxY = $s->maxY;
         }
 
-        // ── Caso 1: un solo match → extender ─────────────────────────────
-        if ($secondMatch === null) {
-            [$index, $matchesHead, $matchesPt1] = $firstMatch;
-            $point     = $matchesPt1 ? $point2 : $point1;
-            $pointKey  = $matchesPt1 ? $key2   : $key1;
-            $addToHead = $matchesHead;
-            $chain     = &$chains[$index];
-            $lenC      = count($chain);
-            $grow      = $addToHead ? $chain[0]        : $chain[$lenC - 1];
-            $grow2     = $addToHead
-                ? ($chain[1]        ?? $chain[0])
-                : ($chain[$lenC - 2] ?? $chain[$lenC - 1]);
-            $opposite  = $addToHead ? $chain[$lenC - 1]: $chain[0];
+        return [$minX, $minY, $maxX, $maxY];
+    }
 
-            // Simplificación colineal en el extremo que crece
-            if ($lenC >= 2 && Point::collinear($grow2, $grow, $point)) {
-                if ($addToHead) {
-                    $oldHeadKey = self::pointKey($chain[0]);
-                    unset($headIndex[$oldHeadKey]);
-                    array_shift($chain);
-                    $grow = $grow2;
-                    $headIndex[self::pointKey($chain[0])] = $index;
+    private static function boundsOverlap(?array $a, ?array $b): bool
+    {
+        if ($a === null || $b === null) {
+            return false;
+        }
+
+        return !(
+            $a[2] < $b[0] ||
+            $b[2] < $a[0] ||
+            $a[3] < $b[1] ||
+            $b[3] < $a[1]
+        );
+    }
+
+    private static function mergeBounds(?array $a, ?array $b): ?array
+    {
+        if ($a === null) return $b;
+        if ($b === null) return $a;
+
+        return [
+            min($a[0], $b[0]),
+            min($a[1], $b[1]),
+            max($a[2], $b[2]),
+            max($a[3], $b[3]),
+        ];
+    }
+
+    public static function segmentChainer(array $segments): array
+    {
+        $regions   = [];
+        $chains    = [];   // id => Point[]
+        $headIndex = [];   // pointKey => chain id
+        $tailIndex = [];   // pointKey => chain id
+        $nextId    = 0;
+
+        foreach ($segments as $segment) {
+            $point1 = $segment->start;
+            $point2 = $segment->end;
+            if ($point1->__eq($point2)) {
+                continue;
+            }
+            $key1 = self::pointKey($point1);
+            $key2 = self::pointKey($point2);
+
+            // Lookup O(1)
+            $matchId1Head = $headIndex[$key1] ?? null;  // head == point1
+            $matchId1Tail = $tailIndex[$key1] ?? null;  // tail == point1
+            $matchId2Head = $headIndex[$key2] ?? null;  // head == point2
+            $matchId2Tail = $tailIndex[$key2] ?? null;  // tail == point2
+
+            // Construir candidatos en el mismo orden de prioridad que el original:
+            // head==pt1, head==pt2, tail==pt1, tail==pt2
+            $candidates = [];
+            if ($matchId1Head !== null) $candidates[] = [$matchId1Head, true,  true];
+            if ($matchId2Head !== null) $candidates[] = [$matchId2Head, true,  false];
+            if ($matchId1Tail !== null) $candidates[] = [$matchId1Tail, false, true];
+            if ($matchId2Tail !== null) $candidates[] = [$matchId2Tail, false, false];
+
+            // Deduplicar por id y tomar los dos primeros
+            $firstMatch  = null;
+            $secondMatch = null;
+            $seen = [];
+            foreach ($candidates as [$cid, $cHead, $cPt1]) {
+                if (isset($seen[$cid])) continue;
+                $seen[$cid] = true;
+                if ($firstMatch === null) {
+                    $firstMatch = [$cid, $cHead, $cPt1];
                 } else {
-                    $oldTailKey = self::pointKey($chain[$lenC - 1]);
-                    unset($tailIndex[$oldTailKey]);
-                    array_pop($chain);
-                    $grow = $grow2;
-                    $tailIndex[self::pointKey(end($chain))] = $index;
+                    $secondMatch = [$cid, $cHead, $cPt1];
+                    break;
                 }
-                $lenC--;
             }
 
-            // ¿El segmento cierra la cadena?
-            if ($opposite->__eq($point)) {
-                // Capturar claves ANTES de la simplificación de cierre
-                $hkClose = self::pointKey($chain[0]);
-                $tkClose = self::pointKey(end($chain));
-                if ($lenC >= 2) {
-                    $opposite2 = $addToHead ? $chain[$lenC - 2] : $chain[1];
-                    if (Point::collinear($opposite2, $opposite, $grow)) {
-                        if ($addToHead) {
-                            array_pop($chain);
-                        } else {
-                            array_shift($chain);
+            // El original itera cadenas por ID creciente → menor ID = firstMatch.
+            // Normalizar para garantizar topología idéntica al original.
+            if (
+                $firstMatch !== null && $secondMatch !== null
+                && $firstMatch[0] > $secondMatch[0]
+            ) {
+                [$firstMatch, $secondMatch] = [$secondMatch, $firstMatch];
+            }
+
+            // ── Caso 0: sin match → nueva cadena ─────────────────────────────
+            if ($firstMatch === null) {
+                $id = $nextId++;
+                $chains[$id]      = [$point1, $point2];
+                $headIndex[$key1] = $id;
+                $tailIndex[$key2] = $id;
+                continue;
+            }
+
+            // ── Caso 1: un solo match → extender ─────────────────────────────
+            if ($secondMatch === null) {
+                [$index, $matchesHead, $matchesPt1] = $firstMatch;
+                $point     = $matchesPt1 ? $point2 : $point1;
+                $pointKey  = $matchesPt1 ? $key2   : $key1;
+                $addToHead = $matchesHead;
+                $chain     = &$chains[$index];
+                $lenC      = count($chain);
+                $grow      = $addToHead ? $chain[0]        : $chain[$lenC - 1];
+                $grow2     = $addToHead
+                    ? ($chain[1]        ?? $chain[0])
+                    : ($chain[$lenC - 2] ?? $chain[$lenC - 1]);
+                $opposite  = $addToHead ? $chain[$lenC - 1] : $chain[0];
+
+                // Simplificación colineal en el extremo que crece
+                if ($lenC >= 2 && Point::collinear($grow2, $grow, $point)) {
+                    if ($addToHead) {
+                        $oldHeadKey = self::pointKey($chain[0]);
+                        unset($headIndex[$oldHeadKey]);
+                        array_shift($chain);
+                        $grow = $grow2;
+                        $headIndex[self::pointKey($chain[0])] = $index;
+                    } else {
+                        $oldTailKey = self::pointKey($chain[$lenC - 1]);
+                        unset($tailIndex[$oldTailKey]);
+                        array_pop($chain);
+                        $grow = $grow2;
+                        $tailIndex[self::pointKey(end($chain))] = $index;
+                    }
+                    $lenC--;
+                }
+
+                // ¿El segmento cierra la cadena?
+                if ($opposite->__eq($point)) {
+                    // Capturar claves ANTES de la simplificación de cierre
+                    $hkClose = self::pointKey($chain[0]);
+                    $tkClose = self::pointKey(end($chain));
+                    if ($lenC >= 2) {
+                        $opposite2 = $addToHead ? $chain[$lenC - 2] : $chain[1];
+                        if (Point::collinear($opposite2, $opposite, $grow)) {
+                            if ($addToHead) {
+                                array_pop($chain);
+                            } else {
+                                array_shift($chain);
+                            }
                         }
                     }
+                    unset($headIndex[$hkClose], $tailIndex[$tkClose], $chains[$index]);
+                    if (count($chain) >= 3) {
+                        $regions[] = $chain;
+                    }
+                    continue;
                 }
-                unset($headIndex[$hkClose], $tailIndex[$tkClose], $chains[$index]);
-                if (count($chain) >= 3) {
-                    $regions[] = $chain;
+
+                // Extender
+                if ($addToHead) {
+                    $oldHKey = self::pointKey($chain[0]);
+                    unset($headIndex[$oldHKey]);
+                    array_unshift($chain, $point);
+                    $headIndex[$pointKey] = $index;
+                } else {
+                    $oldTKey = self::pointKey($chain[$lenC - 1]);
+                    unset($tailIndex[$oldTKey]);
+                    $chain[] = $point;
+                    $tailIndex[$pointKey] = $index;
                 }
                 continue;
             }
 
-            // Extender
-            if ($addToHead) {
-                $oldHKey = self::pointKey($chain[0]);
-                unset($headIndex[$oldHKey]);
-                array_unshift($chain, $point);
-                $headIndex[$pointKey] = $index;
-            } else {
-                $oldTKey = self::pointKey($chain[$lenC - 1]);
-                unset($tailIndex[$oldTKey]);
-                $chain[] = $point;
-                $tailIndex[$pointKey] = $index;
-            }
-            continue;
-        }
+            // ── Caso 2: dos matches → fusionar dos cadenas ───────────────────
+            [$firstIndex,  $firstHead] = $firstMatch;
+            [$secondIndex, $secondHead] = $secondMatch;
+            $reverseFirst = count($chains[$firstIndex]) < count($chains[$secondIndex]);
 
-        // ── Caso 2: dos matches → fusionar dos cadenas ───────────────────
-        [$firstIndex,  $firstHead ] = $firstMatch;
-        [$secondIndex, $secondHead] = $secondMatch;
-        $reverseFirst = count($chains[$firstIndex]) < count($chains[$secondIndex]);
-
-        if ($firstHead) {
-            if ($secondHead) {
-                if ($reverseFirst) {
-                    self::reverseChainIdx($chains, $headIndex, $tailIndex, $firstIndex);
-                    self::appendChainIdx($chains, $headIndex, $tailIndex, $firstIndex, $secondIndex);
+            if ($firstHead) {
+                if ($secondHead) {
+                    if ($reverseFirst) {
+                        self::reverseChainIdx($chains, $headIndex, $tailIndex, $firstIndex);
+                        self::appendChainIdx($chains, $headIndex, $tailIndex, $firstIndex, $secondIndex);
+                    } else {
+                        self::reverseChainIdx($chains, $headIndex, $tailIndex, $secondIndex);
+                        self::appendChainIdx($chains, $headIndex, $tailIndex, $secondIndex, $firstIndex);
+                    }
                 } else {
-                    self::reverseChainIdx($chains, $headIndex, $tailIndex, $secondIndex);
                     self::appendChainIdx($chains, $headIndex, $tailIndex, $secondIndex, $firstIndex);
                 }
             } else {
-                self::appendChainIdx($chains, $headIndex, $tailIndex, $secondIndex, $firstIndex);
-            }
-        } else {
-            if ($secondHead) {
-                self::appendChainIdx($chains, $headIndex, $tailIndex, $firstIndex, $secondIndex);
-            } else {
-                if ($reverseFirst) {
-                    self::reverseChainIdx($chains, $headIndex, $tailIndex, $firstIndex);
-                    self::appendChainIdx($chains, $headIndex, $tailIndex, $secondIndex, $firstIndex);
-                } else {
-                    self::reverseChainIdx($chains, $headIndex, $tailIndex, $secondIndex);
+                if ($secondHead) {
                     self::appendChainIdx($chains, $headIndex, $tailIndex, $firstIndex, $secondIndex);
+                } else {
+                    if ($reverseFirst) {
+                        self::reverseChainIdx($chains, $headIndex, $tailIndex, $firstIndex);
+                        self::appendChainIdx($chains, $headIndex, $tailIndex, $secondIndex, $firstIndex);
+                    } else {
+                        self::reverseChainIdx($chains, $headIndex, $tailIndex, $secondIndex);
+                        self::appendChainIdx($chains, $headIndex, $tailIndex, $firstIndex, $secondIndex);
+                    }
                 }
             }
         }
+
+        return $regions;
     }
-
-    return $regions;
-}
-
-
-
-
-
-
 
     // core API
     public static function segments($polygon): PolySegments
     {
-    $regionIntersecter = new RegionIntersecter();
+        $regionIntersecter = new RegionIntersecter();
 
-    foreach ($polygon->regions as $region) {
-        $regionIntersecter->addRegion($region);
-    }
-
-    $segments = $regionIntersecter->calculate2($polygon->isInverted);
-
-    return self::makePolySegments($segments, $polygon->isInverted);
-    }
-
-    public static function combine($segments1, $segments2) {
-	$segmentIntersecter = new SegmentIntersecter();
-	return new CombinedPolySegments(
-	    $segmentIntersecter->calculate2(
-		$segments1->segments,
-		$segments1->isInverted,
-		$segments2->segments,
-		$segments2->isInverted
-	    ),
-	    $segments1->isInverted,
-	    $segments2->isInverted
-	);
-    }
-
-private static function combineSelect(
-    PolySegments $a,
-    PolySegments $b,
-    string $operation
-): PolySegments {
-    $segmentIntersecter = new SegmentIntersecter();
-
-    $combined = $segmentIntersecter->calculate2(
-        $a->segments,
-        $a->isInverted,
-        $b->segments,
-        $b->isInverted
-    );
-
-    return match ($operation) {
-        'union' => self::makePolySegments(
-            self::__selectUnionLogical($combined),
-            $a->isInverted || $b->isInverted
-        ),
-
-        'intersect' => self::makePolySegments(
-            self::__selectLogical($combined, fn(bool $A, bool $B) => $A && $B),
-            $a->isInverted && $b->isInverted
-        ),
-
-        'difference' => self::makePolySegments(
-            self::__selectLogical($combined, fn(bool $A, bool $B) => $A && !$B),
-            $a->isInverted && !$b->isInverted
-        ),
-
-        'differenceRev' => self::makePolySegments(
-            self::__selectLogical($combined, fn(bool $A, bool $B) => $B && !$A),
-            !$a->isInverted && $b->isInverted
-        ),
-
-        'xor' => self::makePolySegments(
-            self::__selectLogical($combined, fn(bool $A, bool $B) => $A xor $B),
-            $a->isInverted != $b->isInverted
-        ),
-
-        default => throw new \InvalidArgumentException("Operación no soportada: $operation"),
-    };
-}
-
-private static function unionSegments(PolySegments $a, PolySegments $b): PolySegments
-{
-    if (
-        !$a->isInverted &&
-        !$b->isInverted &&
-        !self::boundsOverlap($a->bounds, $b->bounds)
-    ) {
-        return new PolySegments(
-            segments: array_merge($a->segments, $b->segments),
-            isInverted: false,
-            bounds: self::mergeBounds($a->bounds, $b->bounds)
-        );
-    }
-
-    return self::combineSelect($a, $b, 'union');
-}
-
-private static function intersectSegments(PolySegments $a, PolySegments $b): PolySegments
-{
-    if (
-        !$a->isInverted &&
-        !$b->isInverted &&
-        !self::boundsOverlap($a->bounds, $b->bounds)
-    ) {
-        return self::emptyPolySegments(false);
-    }
-
-    return self::combineSelect($a, $b, 'intersect');
-}
-
-private static function xorSegments(PolySegments $a, PolySegments $b): PolySegments
-{
-    if (
-        !$a->isInverted &&
-        !$b->isInverted &&
-        !self::boundsOverlap($a->bounds, $b->bounds)
-    ) {
-        return new PolySegments(
-            segments: array_merge($a->segments, $b->segments),
-            isInverted: false,
-            bounds: self::mergeBounds($a->bounds, $b->bounds)
-        );
-    }
-
-    return self::combineSelect($a, $b, 'xor');
-}
-
-private static function differenceSegments(PolySegments $a, PolySegments $b): PolySegments
-{
-    if (
-        !$a->isInverted &&
-        !$b->isInverted &&
-        !self::boundsOverlap($a->bounds, $b->bounds)
-    ) {
-        return $a;
-    }
-
-    return self::combineSelect($a, $b, 'difference');
-}
-
-private static function differenceRevSegments(PolySegments $a, PolySegments $b): PolySegments
-{
-    if (
-        !$a->isInverted &&
-        !$b->isInverted &&
-        !self::boundsOverlap($a->bounds, $b->bounds)
-    ) {
-        return $b;
-    }
-
-    return self::combineSelect($a, $b, 'differenceRev');
-}
-
-private static function reduceBalanced(array $items, callable $op): PolySegments
-{
-    if (empty($items)) {
-        return self::emptyPolySegments(false);
-    }
-
-    while (count($items) > 1) {
-        $next = [];
-        $n = count($items);
-
-        for ($i = 0; $i < $n; $i += 2) {
-            if ($i + 1 >= $n) {
-                $next[] = $items[$i];
-                continue;
-            }
-
-            $next[] = $op($items[$i], $items[$i + 1]);
+        foreach ($polygon->regions as $region) {
+            $regionIntersecter->addRegion($region);
         }
 
-        $items = $next;
+        $segments = $regionIntersecter->calculate2($polygon->isInverted);
+
+        return self::makePolySegments($segments, $polygon->isInverted);
     }
 
-    return $items[0];
-}
-private static function polygonsToSegments(array $polygons): array
-{
-    $items = [];
-
-    foreach ($polygons as $polygon) {
-        $items[] = self::segments($polygon);
+    public static function combine($segments1, $segments2)
+    {
+        $segmentIntersecter = new SegmentIntersecter();
+        return new CombinedPolySegments(
+            $segmentIntersecter->calculate2(
+                $segments1->segments,
+                $segments1->isInverted,
+                $segments2->segments,
+                $segments2->isInverted
+            ),
+            $segments1->isInverted,
+            $segments2->isInverted
+        );
     }
 
-    usort($items, function (PolySegments $a, PolySegments $b): int {
-        $ba = $a->bounds;
-        $bb = $b->bounds;
+    private static function combineSelect(
+        PolySegments $a,
+        PolySegments $b,
+        string $operation
+    ): PolySegments {
+        $segmentIntersecter = new SegmentIntersecter();
 
-        if ($ba === null && $bb === null) return 0;
-        if ($ba === null) return 1;
-        if ($bb === null) return -1;
+        $combined = $segmentIntersecter->calculate2(
+            $a->segments,
+            $a->isInverted,
+            $b->segments,
+            $b->isInverted
+        );
 
-        return ($ba[0] <=> $bb[0]) ?: ($ba[1] <=> $bb[1]);
-    });
+        return match ($operation) {
+            'union' => self::makePolySegments(
+                self::__selectUnionLogical($combined),
+                $a->isInverted || $b->isInverted
+            ),
 
-    return $items;
-}
+            'intersect' => self::makePolySegments(
+                self::__selectLogical($combined, fn(bool $A, bool $B) => $A && $B),
+                $a->isInverted && $b->isInverted
+            ),
+
+            'difference' => self::makePolySegments(
+                self::__selectLogical($combined, fn(bool $A, bool $B) => $A && !$B),
+                $a->isInverted && !$b->isInverted
+            ),
+
+            'differenceRev' => self::makePolySegments(
+                self::__selectLogical($combined, fn(bool $A, bool $B) => $B && !$A),
+                !$a->isInverted && $b->isInverted
+            ),
+
+            'xor' => self::makePolySegments(
+                self::__selectLogical($combined, fn(bool $A, bool $B) => $A xor $B),
+                $a->isInverted != $b->isInverted
+            ),
+
+            default => throw new \InvalidArgumentException("Operación no soportada: $operation"),
+        };
+    }
+
+    private static function unionSegments(PolySegments $a, PolySegments $b): PolySegments
+    {
+        if (
+            !$a->isInverted &&
+            !$b->isInverted &&
+            !self::boundsOverlap($a->bounds, $b->bounds)
+        ) {
+            return new PolySegments(
+                segments: array_merge($a->segments, $b->segments),
+                isInverted: false,
+                bounds: self::mergeBounds($a->bounds, $b->bounds)
+            );
+        }
+
+        return self::combineSelect($a, $b, 'union');
+    }
+
+    private static function intersectSegments(PolySegments $a, PolySegments $b): PolySegments
+    {
+        if (
+            !$a->isInverted &&
+            !$b->isInverted &&
+            !self::boundsOverlap($a->bounds, $b->bounds)
+        ) {
+            return self::emptyPolySegments(false);
+        }
+
+        return self::combineSelect($a, $b, 'intersect');
+    }
+
+    private static function xorSegments(PolySegments $a, PolySegments $b): PolySegments
+    {
+        if (
+            !$a->isInverted &&
+            !$b->isInverted &&
+            !self::boundsOverlap($a->bounds, $b->bounds)
+        ) {
+            return new PolySegments(
+                segments: array_merge($a->segments, $b->segments),
+                isInverted: false,
+                bounds: self::mergeBounds($a->bounds, $b->bounds)
+            );
+        }
+
+        return self::combineSelect($a, $b, 'xor');
+    }
+
+    private static function differenceSegments(PolySegments $a, PolySegments $b): PolySegments
+    {
+        if (
+            !$a->isInverted &&
+            !$b->isInverted &&
+            !self::boundsOverlap($a->bounds, $b->bounds)
+        ) {
+            return $a;
+        }
+
+        return self::combineSelect($a, $b, 'difference');
+    }
+
+    private static function differenceRevSegments(PolySegments $a, PolySegments $b): PolySegments
+    {
+        if (
+            !$a->isInverted &&
+            !$b->isInverted &&
+            !self::boundsOverlap($a->bounds, $b->bounds)
+        ) {
+            return $b;
+        }
+
+        return self::combineSelect($a, $b, 'differenceRev');
+    }
+
+    private static function reduceBalanced(array $items, callable $op): PolySegments
+    {
+        if (empty($items)) {
+            return self::emptyPolySegments(false);
+        }
+
+        while (count($items) > 1) {
+            $next = [];
+            $n = count($items);
+
+            for ($i = 0; $i < $n; $i += 2) {
+                if ($i + 1 >= $n) {
+                    $next[] = $items[$i];
+                    continue;
+                }
+
+                $next[] = $op($items[$i], $items[$i + 1]);
+            }
+
+            $items = $next;
+        }
+
+        return $items[0];
+    }
+    private static function polygonsToSegments(array $polygons): array
+    {
+        $items = [];
+
+        foreach ($polygons as $polygon) {
+            $items[] = self::segments($polygon);
+        }
+
+        usort($items, function (PolySegments $a, PolySegments $b): int {
+            $ba = $a->bounds;
+            $bb = $b->bounds;
+
+            if ($ba === null && $bb === null) return 0;
+            if ($ba === null) return 1;
+            if ($bb === null) return -1;
+
+            return ($ba[0] <=> $bb[0]) ?: ($ba[1] <=> $bb[1]);
+        });
+
+        return $items;
+    }
 
 
     /**
@@ -528,8 +526,8 @@ private static function polygonsToSegments(array $polygons): array
                 // Conservar: es frontera de la unión.
                 // Fijamos Fill para el resultado (útil para posteriores fases)
                 $result[] = new Segment(
-                    start:  $segment->start,
-                    end:    $segment->end,
+                    start: $segment->start,
+                    end: $segment->end,
                     myFill: new Fill($resB, $resA) // below=resB, above=resA
                 );
             }
@@ -538,54 +536,58 @@ private static function polygonsToSegments(array $polygons): array
         return $result;
     }
 
-    public static function polygon($segments) {
-	// 1) Construye cadenas (como ya haces)
-	$s = self::segmentChainer($segments->segments);
-	// 2) POST-PROCESO: parte anillos auto-tocados en ciclos simples
-	$s = self::splitSelfTouchingRegions($s);
-	// 3) Construye el polígono final
-	$p = Polygon::create()->fillFromArray($s, $segments->isInverted);
-	return $p;
+    public static function polygon($segments)
+    {
+        // 1) Construye cadenas (como ya haces)
+        $s = self::segmentChainer($segments->segments);
+        // 2) POST-PROCESO: parte anillos auto-tocados en ciclos simples
+        $s = self::splitSelfTouchingRegions($s);
+        // 3) Construye el polígono final
+        $p = Polygon::create()->fillFromArray($s, $segments->isInverted);
+        return $p;
     }
 
-public static function __operate($polygon1, $polygon2, $selector): Polygon
-{
-    $first = self::segments($polygon1);
-    $second = self::segments($polygon2);
+    public static function __operate($polygon1, $polygon2, $selector): Polygon
+    {
+        $first = self::segments($polygon1);
+        $second = self::segments($polygon2);
 
-    $operation = match ($selector) {
-        'selectUnion' => 'union',
-        'selectIntersect' => 'intersect',
-        'selectDifference' => 'difference',
-        'selectDifferenceRev' => 'differenceRev',
-        'selectXor' => 'xor',
-        default => throw new \InvalidArgumentException("Selector no soportado: $selector"),
-    };
+        $operation = match ($selector) {
+            'selectUnion' => 'union',
+            'selectIntersect' => 'intersect',
+            'selectDifference' => 'difference',
+            'selectDifferenceRev' => 'differenceRev',
+            'selectXor' => 'xor',
+            default => throw new \InvalidArgumentException("Selector no soportado: $selector"),
+        };
 
-    $result = match ($operation) {
-        'union' => self::unionSegments($first, $second),
-        'intersect' => self::intersectSegments($first, $second),
-        'difference' => self::differenceSegments($first, $second),
-        'differenceRev' => self::differenceRevSegments($first, $second),
-        'xor' => self::xorSegments($first, $second),
-    };
+        $result = match ($operation) {
+            'union' => self::unionSegments($first, $second),
+            'intersect' => self::intersectSegments($first, $second),
+            'difference' => self::differenceSegments($first, $second),
+            'differenceRev' => self::differenceRevSegments($first, $second),
+            'xor' => self::xorSegments($first, $second),
+        };
 
-    return self::polygon($result);
-}
+        return self::polygon($result);
+    }
 
-    public static function splitSelfTouchingRegions(array $regions): array {
-	// Recorre cada región (anillo) y parte si hay puntos repetidos
-	$out = [];
-	foreach ($regions as $ring) {
-    	    foreach (self::__splitRegionAtDuplicates($ring) as $r) {
-        	// guarda solo ciclos con al menos 3 puntos
-        	if (count($r) >= 3) { $out[] = $r; }
-    	    }
-	}
-	//if (Algorithm::DEBUG) {
-    	//    echo "splitSelfTouchingRegions: in=" . count($regions) . " out=" . count($out) . PHP_EOL;
-	//}
-	return $out;
+    public static function splitSelfTouchingRegions(array $regions): array
+    {
+        // Recorre cada región (anillo) y parte si hay puntos repetidos
+        $out = [];
+        foreach ($regions as $ring) {
+            foreach (self::__splitRegionAtDuplicates($ring) as $r) {
+                // guarda solo ciclos con al menos 3 puntos
+                if (count($r) >= 3) {
+                    $out[] = $r;
+                }
+            }
+        }
+        //if (Algorithm::DEBUG) {
+        //    echo "splitSelfTouchingRegions: in=" . count($regions) . " out=" . count($out) . PHP_EOL;
+        //}
+        return $out;
     }
 
 
@@ -601,210 +603,211 @@ public static function __operate($polygon1, $polygon2, $selector): Polygon
      * @param Point[] $ring
      * @return array<int, array<int, Point>>  lista de subciclos
      */
-    private static function __splitRegionAtDuplicates(array $ring): array {
-	$n = count($ring);
-	if ($n < 3) {
-    	    // Degenerado: no es un ciclo válido, devolver tal cual
-    	    return [$ring];
-	}
+    private static function __splitRegionAtDuplicates(array $ring): array
+    {
+        $n = count($ring);
+        if ($n < 3) {
+            // Degenerado: no es un ciclo válido, devolver tal cual
+            return [$ring];
+        }
 
-	// Busca el PRIMER par (i,j) con ring[i] == ring[j], i<j
-	for ($i = 0; $i < $n - 2; $i++) {
-    	    for ($j = $i + 1; $j < $n; $j++) {
-        	if ($ring[$i]->__eq($ring[$j])) {
-            	    // División en dos ciclos
+        // Busca el PRIMER par (i,j) con ring[i] == ring[j], i<j
+        for ($i = 0; $i < $n - 2; $i++) {
+            for ($j = $i + 1; $j < $n; $j++) {
+                if ($ring[$i]->__eq($ring[$j])) {
+                    // División en dos ciclos
 
-            	    // Ciclo 1: [i .. j] (quitar el último si repite el primero)
-            	    $ring1 = array_slice($ring, $i, $j - $i + 1);
-            	    if (count($ring1) >= 2 && end($ring1)->__eq($ring1[0])) {
-                	array_pop($ring1);
-            	    }
+                    // Ciclo 1: [i .. j] (quitar el último si repite el primero)
+                    $ring1 = array_slice($ring, $i, $j - $i + 1);
+                    if (count($ring1) >= 2 && end($ring1)->__eq($ring1[0])) {
+                        array_pop($ring1);
+                    }
 
-            	    // Ciclo 2: [j .. end] + [0 .. i] (quitar el último si repite el primero)
-            	    $part1 = array_slice($ring, $j, $n - $j);
-        	    $part2 = array_slice($ring, 0, $i + 1); // incluye el punto i
-        	    $ring2 = array_merge($part1, $part2);
-        	    if (count($ring2) >= 2 && end($ring2)->__eq($ring2[0])) {
-        	        array_pop($ring2);
-        	    }
-            	    // Recursivo por si aún quedan más puntos repetidos en alguno
-    	            $out = [];
-        	    foreach (self::__splitRegionAtDuplicates($ring1) as $r1) {
-            	        if (count($r1) >= 3) $out[] = $r1;
-            	    }
-    	            foreach (self::__splitRegionAtDuplicates($ring2) as $r2) {
-            	        if (count($r2) >= 3) $out[] = $r2;
-            	    }
-            	    return $out;
-        	}
-    	    }
-	}
+                    // Ciclo 2: [j .. end] + [0 .. i] (quitar el último si repite el primero)
+                    $part1 = array_slice($ring, $j, $n - $j);
+                    $part2 = array_slice($ring, 0, $i + 1); // incluye el punto i
+                    $ring2 = array_merge($part1, $part2);
+                    if (count($ring2) >= 2 && end($ring2)->__eq($ring2[0])) {
+                        array_pop($ring2);
+                    }
+                    // Recursivo por si aún quedan más puntos repetidos en alguno
+                    $out = [];
+                    foreach (self::__splitRegionAtDuplicates($ring1) as $r1) {
+                        if (count($r1) >= 3) $out[] = $r1;
+                    }
+                    foreach (self::__splitRegionAtDuplicates($ring2) as $r2) {
+                        if (count($r2) >= 3) $out[] = $r2;
+                    }
+                    return $out;
+                }
+            }
+        }
 
-	// Si no hay puntos repetidos internos, devolver el anillo tal cual
-	return [$ring];
+        // Si no hay puntos repetidos internos, devolver el anillo tal cual
+        return [$ring];
     }
 
 
     // helper functions for common operations
-public static function union(...$args): Polygon
-{
-    if (count($args) === 1 && is_array($args[0])) {
-        $polygons = $args[0];
+    public static function union(...$args): Polygon
+    {
+        if (count($args) === 1 && is_array($args[0])) {
+            $polygons = $args[0];
 
-        if (empty($polygons)) {
-            return Polygon::create()->fillFromArray([], true);
+            if (empty($polygons)) {
+                return Polygon::create()->fillFromArray([], true);
+            }
+
+            $items = self::polygonsToSegments($polygons);
+
+            $result = self::reduceBalanced(
+                $items,
+                fn(PolySegments $a, PolySegments $b) => self::unionSegments($a, $b)
+            );
+
+            return self::polygon($result);
         }
 
-        $items = self::polygonsToSegments($polygons);
-
-        $result = self::reduceBalanced(
-            $items,
-            fn(PolySegments $a, PolySegments $b) => self::unionSegments($a, $b)
-        );
-
-        return self::polygon($result);
-    }
-
-    if (
-        count($args) === 2 &&
-        is_a($args[0], Polygon::class) &&
-        is_a($args[1], Polygon::class)
-    ) {
-        return self::__operate($args[0], $args[1], 'selectUnion');
-    }
-
-    return Polygon::create()->fillFromArray([], true);
-}
-
-public static function intersection(...$args): Polygon
-{
-    if (count($args) === 1 && is_array($args[0])) {
-        $polygons = $args[0];
-
-        if (empty($polygons)) {
-            return Polygon::create()->fillFromArray([], false);
+        if (
+            count($args) === 2 &&
+            is_a($args[0], Polygon::class) &&
+            is_a($args[1], Polygon::class)
+        ) {
+            return self::__operate($args[0], $args[1], 'selectUnion');
         }
 
-        $items = self::polygonsToSegments($polygons);
-
-        $result = self::reduceBalanced(
-            $items,
-            fn(PolySegments $a, PolySegments $b) => self::intersectSegments($a, $b)
-        );
-
-        return self::polygon($result);
+        return Polygon::create()->fillFromArray([], true);
     }
 
-    if (count($args) === 2) {
-        return self::__operate($args[0], $args[1], 'selectIntersect');
-    }
+    public static function intersection(...$args): Polygon
+    {
+        if (count($args) === 1 && is_array($args[0])) {
+            $polygons = $args[0];
 
-    return Polygon::create()->fillFromArray([], false);
-}
+            if (empty($polygons)) {
+                return Polygon::create()->fillFromArray([], false);
+            }
 
-public static function intersect(...$args): Polygon
-{
-    return self::intersection(...$args);
-}
+            $items = self::polygonsToSegments($polygons);
 
-public static function xoring(...$args): Polygon
-{
-    if (count($args) === 1 && is_array($args[0])) {
-        $polygons = $args[0];
+            $result = self::reduceBalanced(
+                $items,
+                fn(PolySegments $a, PolySegments $b) => self::intersectSegments($a, $b)
+            );
 
-        if (empty($polygons)) {
-            return Polygon::create()->fillFromArray([], false);
+            return self::polygon($result);
         }
 
-        $items = self::polygonsToSegments($polygons);
-
-        $result = self::reduceBalanced(
-            $items,
-            fn(PolySegments $a, PolySegments $b) => self::xorSegments($a, $b)
-        );
-
-        return self::polygon($result);
-    }
-
-    if (count($args) === 2) {
-        return self::__operate($args[0], $args[1], 'selectXor');
-    }
-
-    return Polygon::create()->fillFromArray([], false);
-}
-
-public static function difference(...$args): Polygon
-{
-    if (count($args) === 1 && is_array($args[0])) {
-        $polygons = $args[0];
-
-        if (empty($polygons)) {
-            return Polygon::create()->fillFromArray([], false);
+        if (count($args) === 2) {
+            return self::__operate($args[0], $args[1], 'selectIntersect');
         }
 
-        if (count($polygons) === 1) {
-            return $polygons[0];
+        return Polygon::create()->fillFromArray([], false);
+    }
+
+    public static function intersect(...$args): Polygon
+    {
+        return self::intersection(...$args);
+    }
+
+    public static function xoring(...$args): Polygon
+    {
+        if (count($args) === 1 && is_array($args[0])) {
+            $polygons = $args[0];
+
+            if (empty($polygons)) {
+                return Polygon::create()->fillFromArray([], false);
+            }
+
+            $items = self::polygonsToSegments($polygons);
+
+            $result = self::reduceBalanced(
+                $items,
+                fn(PolySegments $a, PolySegments $b) => self::xorSegments($a, $b)
+            );
+
+            return self::polygon($result);
         }
 
-        $base = self::segments($polygons[0]);
-
-        $subtractors = array_slice($polygons, 1);
-        $subtractorsSegments = self::polygonsToSegments($subtractors);
-
-        $subtractorUnion = self::reduceBalanced(
-            $subtractorsSegments,
-            fn(PolySegments $a, PolySegments $b) => self::unionSegments($a, $b)
-        );
-
-        $result = self::differenceSegments($base, $subtractorUnion);
-
-        return self::polygon($result);
-    }
-
-    if (count($args) === 2) {
-        return self::__operate($args[0], $args[1], 'selectDifference');
-    }
-
-    return Polygon::create()->fillFromArray([], false);
-}
-
-// el último menos todos los anteriores
-public static function differenceRev(...$args): Polygon
-{
-    if (count($args) === 1 && is_array($args[0])) {
-        $polygons = $args[0];
-
-        if (empty($polygons)) {
-            return Polygon::create()->fillFromArray([], false);
+        if (count($args) === 2) {
+            return self::__operate($args[0], $args[1], 'selectXor');
         }
 
-        if (count($polygons) === 1) {
-            return $polygons[0];
+        return Polygon::create()->fillFromArray([], false);
+    }
+
+    public static function difference(...$args): Polygon
+    {
+        if (count($args) === 1 && is_array($args[0])) {
+            $polygons = $args[0];
+
+            if (empty($polygons)) {
+                return Polygon::create()->fillFromArray([], false);
+            }
+
+            if (count($polygons) === 1) {
+                return $polygons[0];
+            }
+
+            $base = self::segments($polygons[0]);
+
+            $subtractors = array_slice($polygons, 1);
+            $subtractorsSegments = self::polygonsToSegments($subtractors);
+
+            $subtractorUnion = self::reduceBalanced(
+                $subtractorsSegments,
+                fn(PolySegments $a, PolySegments $b) => self::unionSegments($a, $b)
+            );
+
+            $result = self::differenceSegments($base, $subtractorUnion);
+
+            return self::polygon($result);
         }
 
-        $lastIndex = count($polygons) - 1;
+        if (count($args) === 2) {
+            return self::__operate($args[0], $args[1], 'selectDifference');
+        }
 
-        $base = self::segments($polygons[$lastIndex]);
-
-        $subtractors = array_slice($polygons, 0, $lastIndex);
-        $subtractorsSegments = self::polygonsToSegments($subtractors);
-
-        $subtractorUnion = self::reduceBalanced(
-            $subtractorsSegments,
-            fn(PolySegments $a, PolySegments $b) => self::unionSegments($a, $b)
-        );
-
-        $result = self::differenceSegments($base, $subtractorUnion);
-
-        return self::polygon($result);
+        return Polygon::create()->fillFromArray([], false);
     }
 
-    if (count($args) === 2) {
-        return self::__operate($args[0], $args[1], 'selectDifferenceRev');
-    }
+    // el último menos todos los anteriores
+    public static function differenceRev(...$args): Polygon
+    {
+        if (count($args) === 1 && is_array($args[0])) {
+            $polygons = $args[0];
 
-    return Polygon::create()->fillFromArray([], false);
-}
+            if (empty($polygons)) {
+                return Polygon::create()->fillFromArray([], false);
+            }
+
+            if (count($polygons) === 1) {
+                return $polygons[0];
+            }
+
+            $lastIndex = count($polygons) - 1;
+
+            $base = self::segments($polygons[$lastIndex]);
+
+            $subtractors = array_slice($polygons, 0, $lastIndex);
+            $subtractorsSegments = self::polygonsToSegments($subtractors);
+
+            $subtractorUnion = self::reduceBalanced(
+                $subtractorsSegments,
+                fn(PolySegments $a, PolySegments $b) => self::unionSegments($a, $b)
+            );
+
+            $result = self::differenceSegments($base, $subtractorUnion);
+
+            return self::polygon($result);
+        }
+
+        if (count($args) === 2) {
+            return self::__operate($args[0], $args[1], 'selectDifferenceRev');
+        }
+
+        return Polygon::create()->fillFromArray([], false);
+    }
 
 
 
@@ -835,8 +838,8 @@ public static function differenceRev(...$args): Polygon
             if ($resAbove !== $resBelow) {
                 // Propagamos un Fill “del resultado” (útil para fases posteriores)
                 $result[] = new Segment(
-                    start:  $seg->start,
-                    end:    $seg->end,
+                    start: $seg->start,
+                    end: $seg->end,
                     myFill: new Fill($resBelow, $resAbove)
                 );
             }
@@ -851,7 +854,7 @@ public static function differenceRev(...$args): Polygon
             fn(bool $A, bool $B) => ($A || $B)
         );
         return new PolySegments(
-            segments:   $segments,
+            segments: $segments,
             isInverted: ($combinedPolySegments->isInverted1 || $combinedPolySegments->isInverted2)
         );
     }
@@ -863,7 +866,7 @@ public static function differenceRev(...$args): Polygon
             fn(bool $A, bool $B) => ($A && $B)
         );
         return new PolySegments(
-            segments:   $segments,
+            segments: $segments,
             isInverted: ($combinedPolySegments->isInverted1 && $combinedPolySegments->isInverted2)
         );
     }
@@ -876,7 +879,7 @@ public static function differenceRev(...$args): Polygon
             fn(bool $A, bool $B) => ($A && !$B)
         );
         return new PolySegments(
-            segments:   $segments,
+            segments: $segments,
             isInverted: ($combinedPolySegments->isInverted1 && !$combinedPolySegments->isInverted2)
         );
     }
@@ -889,7 +892,7 @@ public static function differenceRev(...$args): Polygon
             fn(bool $A, bool $B) => ($B && !$A)
         );
         return new PolySegments(
-            segments:   $segments,
+            segments: $segments,
             isInverted: (!$combinedPolySegments->isInverted1 && $combinedPolySegments->isInverted2)
         );
     }
@@ -902,10 +905,8 @@ public static function differenceRev(...$args): Polygon
             fn(bool $A, bool $B) => ($A xor $B)
         );
         return new PolySegments(
-            segments:   $segments,
+            segments: $segments,
             isInverted: ($combinedPolySegments->isInverted1 != $combinedPolySegments->isInverted2)
         );
     }
-
 }
-

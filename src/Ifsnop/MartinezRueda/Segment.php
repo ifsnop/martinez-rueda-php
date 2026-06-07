@@ -1,9 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-final class Segment {
+final class Segment
+{
     public Point $start;
     public Point $end;
     public ?Fill $myFill;
@@ -16,14 +18,14 @@ final class Segment {
     public float $maxY;
     public float $len2; // longitud al cuadrado
 
-
-    public function __construct(Point $start, Point $end, Fill $myFill = null, Fill $otherFill = null) {
-	// if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
-	$this->start = $start;
-	$this->end = $end;
-	$this->myFill = $myFill;
-	$this->otherFill = $otherFill;
-	$this->recalcBounds();
+    public function __construct(Point $start, Point $end, Fill $myFill = null, Fill $otherFill = null)
+    {
+        // if ( Algorithm::DEBUG ) print __METHOD__ . PHP_EOL;
+        $this->start = $start;
+        $this->end = $end;
+        $this->myFill = $myFill;
+        $this->otherFill = $otherFill;
+        $this->recalcBounds();
     }
 
     /** Recalcula min/max y longitud cuadrada */
@@ -47,12 +49,13 @@ final class Segment {
     }
 
 
-    public function __toString():string {
-	return "S: {$this->start}, E: {$this->end}";
+    public function __toString(): string
+    {
+        return "S: {$this->start}, E: {$this->end}";
     }
 
-    public function __debugInfo():array {
-	return ["start" => $this->start, "end" => $this->end, 'myFill' => $this->myFill, 'otherFill' => $this->otherFill];
+    public function __debugInfo(): array
+    {
+        return ["start" => $this->start, "end" => $this->end, 'myFill' => $this->myFill, 'otherFill' => $this->otherFill];
     }
 }
-
