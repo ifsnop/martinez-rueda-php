@@ -99,7 +99,7 @@ class Intersecter
         $ev->other->pt = $end;
         $this->eventAdd($ev->other, $ev->pt);
     }
-
+    /*
     private function eventDivide(Node $ev, Point $pt): Node
     {
         // No dividir en los extremos: evita segmentos de longitud 0
@@ -110,6 +110,35 @@ class Intersecter
         // División real
         $ns = $this->segmentCopy($pt, $seg->end, $seg);
 
+        $this->eventUpdateEnd($ev, $pt);
+        return $this->eventAddSegment($ns, $ev->primary);
+    }
+*/
+    private function eventDivide(Node $ev, Point $pt): Node
+    {
+        $seg = $ev->seg;
+
+        // DIAGNÓSTICO: detectar el caso problemático
+        $cmp = Point::compare($pt, $ev->pt);
+        if ($cmp <= 0) {
+            // El punto de intersección cae antes o en el start del segmento
+            // Esto causaría "end event before start" si no lo interceptamos
+            error_log(sprintf(
+                "eventDivide: pt(%.17f,%.17f) <= ev->pt(%.17f,%.17f), diff_x=%.3e",
+                $pt->x,
+                $pt->y,
+                $ev->pt->x,
+                $ev->pt->y,
+                $pt->x - $ev->pt->x
+            ));
+            return $ev;  // abortar la división
+        }
+
+        if ($pt->__eq($seg->start) || $pt->__eq($seg->end)) {
+            return $ev;
+        }
+
+        $ns = $this->segmentCopy($pt, $seg->end, $seg);
         $this->eventUpdateEnd($ev, $pt);
         return $this->eventAddSegment($ns, $ev->primary);
     }
