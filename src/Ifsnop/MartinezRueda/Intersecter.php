@@ -104,24 +104,6 @@ class Intersecter
     {
         $seg = $ev->seg;
 
-        // Guardia: el punto de intersección puede caer ligeramente ANTES del start
-        // del segmento por acumulación de errores de punto flotante en divisiones
-        // encadenadas. Si ocurre, abortar la división — el punto es prácticamente
-        // coincidente con el start y el algoritmo ya lo maneja por otras vías.
-        if (Point::compare($pt, $ev->pt) <= 0) {
-            // El punto de intersección cae antes o en el start del segmento
-            // Esto causaría "end event before start" si no lo interceptamos
-            // sprintf(
-            //    "eventDivide: pt(%.17f,%.17f) <= ev->pt(%.17f,%.17f), diff_x=%.3e",
-            //    $pt->x,
-            //    $pt->y,
-            //    $ev->pt->x,
-            //    $ev->pt->y,
-            //    $pt->x - $ev->pt->x
-            //);
-            return $ev;
-        }
-
         // No dividir en los extremos: evita segmentos de longitud 0
         if ($pt->__eq($seg->start) || $pt->__eq($seg->end)) {
             return $ev;
@@ -196,30 +178,17 @@ class Intersecter
                 $this->eventDivide($ev2, $a1);
             }
         } else { // $i != null
-
-            // Snap: el cálculo de la intersección puede producir un punto que cae
-            // ligeramente fuera del bounding box de un segmento por acumulación de
-            // errores de punto flotante en divisiones encadenadas. Si la distancia
-            // absoluta al endpoint más cercano es menor que TOLERANCE_SQRT, tratar
-            // el punto como coincidente con ese endpoint y corregir el 'along'.
-            $pt  = $i->point;
-            $eps = Algorithm::TOLERANCE_SQRT;
-            if ($i->alongA === -2 && abs($pt->x - $a1->x) < $eps && abs($pt->y - $a1->y) < $eps) {
-                $i = new IntersectionPoint(-1, $i->alongB, $a1);
-            } elseif ($i->alongA === 2 && abs($pt->x - $a2->x) < $eps && abs($pt->y - $a2->y) < $eps) {
-                $i = new IntersectionPoint(1, $i->alongB, $a2);
-            }
-            $pt = $i->point;
-            if ($i->alongB === -2 && abs($pt->x - $b1->x) < $eps && abs($pt->y - $b1->y) < $eps) {
-                $i = new IntersectionPoint($i->alongA, -1, $b1);
-            } elseif ($i->alongB === 2 && abs($pt->x - $b2->x) < $eps && abs($pt->y - $b2->y) < $eps) {
-                $i = new IntersectionPoint($i->alongA, 1, $b2);
-            }
-
-
             if ($i->alongA === 0) {
                 if ($i->alongB === -1) {
-                    $this->eventDivide($ev1, $b1);
+                    if (Point::compare($b1, $a1) > 0) {
+                        $this->eventDivide($ev1, $b1);
+                    } else {
+                        // b1 está antes del start de ev1 por error de FP:
+                        // dividir ev2 en a1 como operación equivalente
+                        if (Point::compare($a1, $b1) > 0 && Point::compare($b2, $a1) > 0) {
+                            $this->eventDivide($ev2, $a1);
+                        }
+                    }
                 } elseif ($i->alongB === 0) {
                     $this->eventDivide($ev1, $i->point);
                 } elseif ($i->alongB === 1) {
@@ -228,7 +197,15 @@ class Intersecter
             }
             if ($i->alongB === 0) {
                 if ($i->alongA === -1) {
-                    $this->eventDivide($ev2, $a1);
+                    if (Point::compare($a1, $b1) > 0) {
+                        $this->eventDivide($ev2, $a1);
+                    } else {
+                        // a1 está antes del start de ev2 por error de FP:
+                        // dividir ev1 en b1 como operación equivalente
+                        if (Point::compare($b1, $a1) > 0 && Point::compare($a2, $b1) > 0) {
+                            $this->eventDivide($ev1, $b1);
+                        }
+                    }
                 } elseif ($i->alongA === 0) {
                     $this->eventDivide($ev2, $i->point);
                 } elseif ($i->alongA === 1) {
