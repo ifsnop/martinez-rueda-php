@@ -99,45 +99,35 @@ class Intersecter
         $ev->other->pt = $end;
         $this->eventAdd($ev->other, $ev->pt);
     }
-    /*
-    private function eventDivide(Node $ev, Point $pt): Node
-    {
-        // No dividir en los extremos: evita segmentos de longitud 0
-        $seg = $ev->seg;
-        if ($pt->__eq($seg->start) || $pt->__eq($seg->end)) {
-            return $ev; // o $ev->other; cualquiera es válido aquí
-        }
-        // División real
-        $ns = $this->segmentCopy($pt, $seg->end, $seg);
 
-        $this->eventUpdateEnd($ev, $pt);
-        return $this->eventAddSegment($ns, $ev->primary);
-    }
-*/
     private function eventDivide(Node $ev, Point $pt): Node
     {
         $seg = $ev->seg;
 
-        // DIAGNÓSTICO: detectar el caso problemático
-        $cmp = Point::compare($pt, $ev->pt);
-        if ($cmp <= 0) {
+        // Guardia: el punto de intersección puede caer ligeramente ANTES del start
+        // del segmento por acumulación de errores de punto flotante en divisiones
+        // encadenadas. Si ocurre, abortar la división — el punto es prácticamente
+        // coincidente con el start y el algoritmo ya lo maneja por otras vías.
+        if (Point::compare($pt, $ev->pt) <= 0) {
             // El punto de intersección cae antes o en el start del segmento
             // Esto causaría "end event before start" si no lo interceptamos
-            error_log(sprintf(
-                "eventDivide: pt(%.17f,%.17f) <= ev->pt(%.17f,%.17f), diff_x=%.3e",
-                $pt->x,
-                $pt->y,
-                $ev->pt->x,
-                $ev->pt->y,
-                $pt->x - $ev->pt->x
-            ));
-            return $ev;  // abortar la división
+            // sprintf(
+            //    "eventDivide: pt(%.17f,%.17f) <= ev->pt(%.17f,%.17f), diff_x=%.3e",
+            //    $pt->x,
+            //    $pt->y,
+            //    $ev->pt->x,
+            //    $ev->pt->y,
+            //    $pt->x - $ev->pt->x
+            //);
+            return $ev;
         }
 
+        // No dividir en los extremos: evita segmentos de longitud 0
         if ($pt->__eq($seg->start) || $pt->__eq($seg->end)) {
             return $ev;
         }
 
+        // División real
         $ns = $this->segmentCopy($pt, $seg->end, $seg);
         $this->eventUpdateEnd($ev, $pt);
         return $this->eventAddSegment($ns, $ev->primary);
