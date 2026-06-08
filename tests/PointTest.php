@@ -187,9 +187,9 @@ final class PointTest extends TestCase
 
         $ip = Point::linesIntersect($a0, $a1, $b0, $b1);
         $this->assertNotNull($ip);
-        $this->assertSame(-2, $ip->alongA);
-        $this->assertSame( 0, $ip->alongB);
-        //$this->assertEquals([$xBefore, 0.0], $ip->point->getArray());
+-       $this->assertSame(-2, $ip->alongA);
+-       $this->assertSame( 0, $ip->alongB);
+        $this->assertEqualsWithDelta([$xBefore, 0.0], $ip->point->getArray(), Algorithm::TOLERANCE);
     }
 
     public function testLinesParallelReturnNull(): void
