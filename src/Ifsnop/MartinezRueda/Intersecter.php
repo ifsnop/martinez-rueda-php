@@ -196,6 +196,27 @@ class Intersecter
                 $this->eventDivide($ev2, $a1);
             }
         } else { // $i != null
+
+            // Snap: el cálculo de la intersección puede producir un punto que cae
+            // ligeramente fuera del bounding box de un segmento por acumulación de
+            // errores de punto flotante en divisiones encadenadas. Si la distancia
+            // absoluta al endpoint más cercano es menor que TOLERANCE_SQRT, tratar
+            // el punto como coincidente con ese endpoint y corregir el 'along'.
+            $pt  = $i->point;
+            $eps = Algorithm::TOLERANCE_SQRT;
+            if ($i->alongA === -2 && abs($pt->x - $a1->x) < $eps && abs($pt->y - $a1->y) < $eps) {
+                $i = new IntersectionPoint(-1, $i->alongB, $a1);
+            } elseif ($i->alongA === 2 && abs($pt->x - $a2->x) < $eps && abs($pt->y - $a2->y) < $eps) {
+                $i = new IntersectionPoint(1, $i->alongB, $a2);
+            }
+            $pt = $i->point;
+            if ($i->alongB === -2 && abs($pt->x - $b1->x) < $eps && abs($pt->y - $b1->y) < $eps) {
+                $i = new IntersectionPoint($i->alongA, -1, $b1);
+            } elseif ($i->alongB === 2 && abs($pt->x - $b2->x) < $eps && abs($pt->y - $b2->y) < $eps) {
+                $i = new IntersectionPoint($i->alongA, 1, $b2);
+            }
+
+
             if ($i->alongA === 0) {
                 if ($i->alongB === -1) {
                     $this->eventDivide($ev1, $b1);

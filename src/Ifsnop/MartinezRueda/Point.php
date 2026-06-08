@@ -150,6 +150,7 @@ final class Point
      *  1 → casi al final,
      *  2 → fuera por la derecha.
      */
+    /*
     private static function __calcAlongUsingValue(float $value)
     {
         $epsStrict = Algorithm::TOLERANCE;
@@ -168,8 +169,26 @@ final class Point
             return 1;
         }
         return 2;
+    }*/
+    private static function __calcAlongUsingValue(float $value)
+    {
+        $epsStrict = Algorithm::TOLERANCE;
+        $epsSnap   = Algorithm::TOLERANCE_SQRT;
+        if ($value < -$epsSnap) {    // ← CAMBIO: era -$epsStrict (1e-12), ahora -$epsSnap (1e-6)
+            return -2;
+        }
+        if ($value < $epsSnap) {
+            return -1;
+        }
+        $d1 = $value - 1.0;
+        if ($d1 <= -$epsSnap) {
+            return 0;
+        }
+        if ($d1 < $epsStrict) {
+            return 1;
+        }
+        return 2;
     }
-
     /*
      * Comprueba si otro objeto es un punto equivalente (coordenadas casi iguales).
      */

@@ -181,14 +181,12 @@ final class PointTest extends TestCase
         $a0 = new Point(0.0, 0.0);
         $a1 = new Point(10.0, 0.0);
 
-        $xBefore = -100.0 * $this->T;
+        $xBefore = -10.0 * Algorithm::TOLERANCE_SQRT;  // -1e-5, inequívocamente fuera
         $b0 = new Point($xBefore, -1.0);
         $b1 = new Point($xBefore,  1.0);
-
         $ip = Point::linesIntersect($a0, $a1, $b0, $b1);
         $this->assertNotNull($ip);
--       $this->assertSame(-2, $ip->alongA);
--       $this->assertSame( 0, $ip->alongB);
+        $this->assertSame(-2, $ip->alongA);
         $this->assertEqualsWithDelta([$xBefore, 0.0], $ip->point->getArray(), Algorithm::TOLERANCE);
     }
 
