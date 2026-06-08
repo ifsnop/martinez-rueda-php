@@ -1,19 +1,233 @@
 <?php
-// tests/IntersecterTest.php
+declare(strict_types=1);
+error_reporting(E_ALL);
+ini_set("display_errors", 1);
 
-namespace Ifsnop\MartinezRueda\Tests;
+include_once('autoloader.php');
 
 use PHPUnit\Framework\TestCase;
 use Ifsnop\MartinezRueda\Algorithm;
+use Ifsnop\MartinezRueda\SegmentIntersecter;
+use Ifsnop\MartinezRueda\RegionIntersecter;
+use Ifsnop\MartinezRueda\Fill;
 use Ifsnop\MartinezRueda\Intersecter;
 use Ifsnop\MartinezRueda\Point;
+use Ifsnop\MartinezRueda\Polygon;
+use Ifsnop\MartinezRueda\PolySegments;
+use Ifsnop\MartinezRueda\PolyBoolException;
 use Ifsnop\MartinezRueda\Segment;
-use Ifsnop\MartinezRueda\Fill;
+use Ifsnop\MartinezRueda\StatusList;
 use Ifsnop\MartinezRueda\Node;
 
+// ═════════════════════════════════════════════════════════════════════════════
+// 5. INTERSECTER (vía RegionIntersecter y SegmentIntersecter)
+// ─────────────────────────────────────────────────────────────────────────────
+// Intersecter es el corazón del algoritmo Bentley-Ottmann.  Los tests validan
+// el contrato público observable: que el número y geometría de los segmentos
+// de salida sean correctos para entradas canónicas.
+// ═════════════════════════════════════════════════════════════════════════════
 class IntersecterTest extends TestCase
 {
-    private Intersecter $intersecter;
+
+    // ── Helper: crea un Polygon simple (cuadrado) ────────────────────────────
+    private function square(float $x, float $y, float $size): Polygon
+    {
+        return Polygon::create()->fillFromArray([[
+            new Point($x,         $y),
+            new Point($x + $size, $y),
+            new Point($x + $size, $y + $size),
+            new Point($x,         $y + $size),
+        ]]);
+    }
+
+    // ── RegionIntersecter ────────────────────────────────────────────────────
+
+    public function testRegionIntersecterProducesSegmentsForSquare(): void
+    {
+        $ri = new RegionIntersecter();
+        $ri->addRegion([
+            new Point(0, 0),
+            new Point(1, 0),
+            new Point(1, 1),
+            new Point(0, 1),
+        ]);
+        $segs = $ri->calculate2(false);
+        // Un cuadrado tiene 4 lados → 4 segmentos
+        $this->assertCount(4, $segs);
+    }
+
+    public function testRegionIntersecterAllSegmentsAreSegmentInstances(): void
+    {
+        $ri = new RegionIntersecter();
+        $ri->addRegion([
+            new Point(0, 0), new Point(2, 0),
+            new Point(2, 2), new Point(0, 2),
+        ]);
+        foreach ($ri->calculate2(false) as $s) {
+            $this->assertInstanceOf(Segment::class, $s);
+        }
+    }
+
+    public function testRegionIntersecterSkipsDegenerateEdge(): void
+    {
+        // Un "cuadrado" con un punto repetido → ese borde es degenerado y se salta
+        $ri = new RegionIntersecter();
+        $ri->addRegion([
+            new Point(0, 0),
+            new Point(0, 0), // duplicado → borde de longitud 0
+            new Point(1, 0),
+            new Point(1, 1),
+            new Point(0, 1),
+        ]);
+        $segs = $ri->calculate2(false);
+        // El borde degenerado se omite; los 4 válidos quedan
+        $this->assertCount(4, $segs);
+    }
+
+    // ── eventAddSegment: detección de segmento de longitud 0 ────────────────
+
+    public function testEventAddSegmentThrowsOnZeroLength(): void
+    {
+        $this->expectException(PolyBoolException::class);
+
+        $ri  = new RegionIntersecter();
+        $seg = new Segment(new Point(1, 1), new Point(1, 1), new Fill());
+        $ri->eventAddSegment($seg, true);
+    }
+
+    // ── eventAddSegment: normaliza dirección ────────────────────────────────
+
+    public function testEventAddSegmentNormalizesDirection(): void
+    {
+        // Si start > end lexicográficamente, deben invertirse
+        $ri  = new RegionIntersecter();
+        $seg = new Segment(new Point(5, 5), new Point(1, 1), new Fill());
+        $ri->eventAddSegment($seg, true);
+        // Después de normalizar: start debe ser el punto "menor"
+        $this->assertSame(1.0, $seg->start->x);
+        $this->assertSame(1.0, $seg->start->y);
+    }
+
+    // ── SegmentIntersecter: dos cuadrados separados ──────────────────────────
+
+    public function testSegmentIntersecterSeparatedSquares(): void
+    {
+        $poly1 = $this->square(0, 0, 1);
+        $poly2 = $this->square(5, 5, 1); // sin solapamiento
+
+        $segs1 = Algorithm::segments($poly1);
+        $segs2 = Algorithm::segments($poly2);
+
+        $si   = new SegmentIntersecter();
+        $segs = $si->calculate2(
+            $segs1->segments, false,
+            $segs2->segments, false
+        );
+        // Sin cruce → 8 segmentos (4+4), sin subdivisiones
+        $this->assertCount(8, $segs);
+    }
+
+    // ── SegmentIntersecter: dos cuadrados solapados ──────────────────────────
+
+    public function testSegmentIntersecterOverlappingSquares(): void
+    {
+        $poly1 = $this->square(0, 0, 2);
+        $poly2 = $this->square(1, 0, 2); // solapan en x=[1,2]
+
+        $segs1 = Algorithm::segments($poly1);
+        $segs2 = Algorithm::segments($poly2);
+
+        $si   = new SegmentIntersecter();
+        $segs = $si->calculate2(
+            $segs1->segments, false,
+            $segs2->segments, false
+        );
+
+        // Los segmentos solapados se subdividen → más de 8 segmentos
+        $this->assertGreaterThan(8, count($segs));
+    }
+
+    // ── Algorithm::segments devuelve PolySegments válido ────────────────────
+
+    public function testAlgorithmSegmentsReturnsPolySegments(): void
+    {
+        $poly = $this->square(0, 0, 1);
+        $ps   = Algorithm::segments($poly);
+        $this->assertInstanceOf(PolySegments::class, $ps);
+        $this->assertNotEmpty($ps->segments);
+    }
+
+    // ── Algorithm alto nivel: unión de cuadrados separados ──────────────────
+
+    public function testUnionDisjointSquares(): void
+    {
+        $poly1 = $this->square(0, 0, 1);
+        $poly2 = $this->square(5, 5, 1);
+
+        $result = Algorithm::union($poly1, $poly2);
+
+        $this->assertInstanceOf(Polygon::class, $result);
+        // Resultado: dos regiones independientes
+        $this->assertCount(2, $result->regions);
+    }
+
+    // ── Algorithm alto nivel: intersección de cuadrados solapados ───────────
+
+    public function testIntersectOverlappingSquares(): void
+    {
+        $poly1 = $this->square(0, 0, 2);
+        $poly2 = $this->square(1, 0, 2); // intersección = [1,2]×[0,2]
+
+        $result = Algorithm::intersect($poly1, $poly2);
+
+        $this->assertInstanceOf(Polygon::class, $result);
+        $this->assertNotEmpty($result->regions);
+    }
+
+    // ── Algorithm alto nivel: diferencia deja un solo polígono ──────────────
+
+    public function testDifferenceProducesNonEmptyResult(): void
+    {
+        $poly1 = $this->square(0, 0, 4);
+        $poly2 = $this->square(1, 1, 2); // cuadrado pequeño interior
+
+        $result = Algorithm::difference($poly1, $poly2);
+
+        $this->assertInstanceOf(Polygon::class, $result);
+        $this->assertNotEmpty($result->regions);
+    }
+
+    // ── newSegment y segmentCopy ─────────────────────────────────────────────
+
+    public function testNewSegmentHasFill(): void
+    {
+        $ri  = new RegionIntersecter();
+        $seg = $ri->newSegment(new Point(0, 0), new Point(1, 1));
+        $this->assertInstanceOf(Fill::class, $seg->myFill);
+    }
+
+    public function testSegmentCopyCopiesFill(): void
+    {
+        $ri      = new RegionIntersecter();
+        $fill    = new Fill(true, false);
+        $orig    = new Segment(new Point(0, 0), new Point(1, 1), $fill);
+        $copy    = $ri->segmentCopy(new Point(0, 0), new Point(1, 1), $orig);
+        $this->assertTrue($copy->myFill->below);
+        $this->assertFalse($copy->myFill->above);
+    }
+
+    public function testSegmentCopyIsIndependent(): void
+    {
+        $ri   = new RegionIntersecter();
+        $fill = new Fill(true, false);
+        $orig = new Segment(new Point(0, 0), new Point(1, 1), $fill);
+        $copy = $ri->segmentCopy(new Point(0, 0), new Point(1, 1), $orig);
+
+        // Mutar la copia no afecta al original
+        $copy->myFill->below = false;
+        $this->assertTrue($orig->myFill->below);
+    }
+private Intersecter $intersecter;
 
     protected function setUp(): void
     {
@@ -404,7 +618,7 @@ class IntersecterTest extends TestCase
         $segment = $this->intersecter->newSegment(
             new Point(0.0, 0.0),
             new Point(Algorithm::TOLERANCE/100.0,
-		Algorithm::TOLERANCE/100.0)  // Menor que TOLERANCE
+	Algorithm::TOLERANCE/100.0)  // Menor que TOLERANCE
         );
         
         $this->intersecter->eventAddSegment($segment, primary: true);
@@ -498,4 +712,5 @@ class IntersecterTest extends TestCase
         $this->assertIsArray($result);
         $this->assertCount(3, $result);
     }
+
 }

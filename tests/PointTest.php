@@ -226,7 +226,14 @@ final class PointTest extends TestCase
 
         $this->assertTrue($a->__eq($b));
         $this->assertFalse($a->__eq($c));
+
+        /** Diferencia inferior a TOLERANCE debe considerarse igual */
+        $eps = Algorithm::TOLERANCE * 0.5;
+        $p   = new Point(1.0, 1.0);
+        $this->assertTrue($p->__eq(new Point(1.0 + $eps, 1.0 + $eps)));
     }
+
+
 
     public function testToStringAndReprAndGetArray(): void
     {
@@ -235,4 +242,203 @@ final class PointTest extends TestCase
         $this->assertSame('1.5,-2.25', $p->__repr());
         $this->assertSame([1.5, -2.25], $p->getArray());
     }
+
+    // ── __eq ────────────────────────────────────────────────────────────────
+
+    public function testEqSamePoint(): void
+    {
+        $p = new Point(1.0, 2.0);
+        $this->assertTrue($p->__eq(new Point(1.0, 2.0)));
+    }
+
+    public function testEqDifferentPoint(): void
+    {
+        $p = new Point(1.0, 2.0);
+        $this->assertFalse($p->__eq(new Point(1.0, 3.0)));
+    }
+
+    /** Diferencia superior a TOLERANCE debe considerarse distinta */
+    public function testEqBeyondTolerance(): void
+    {
+        $eps = Algorithm::TOLERANCE * 2.0;
+        $p   = new Point(1.0, 1.0);
+        $this->assertFalse($p->__eq(new Point(1.0 + $eps, 1.0)));
+    }
+
+    // ── compare ─────────────────────────────────────────────────────────────
+
+    public function testCompareEqual(): void
+    {
+        $this->assertSame(0, Point::compare(new Point(3.0, 4.0), new Point(3.0, 4.0)));
+    }
+
+    public function testCompareXPriority(): void
+    {
+        // x más pequeño → -1 independientemente de y
+        $this->assertSame(-1, Point::compare(new Point(1.0, 99.0), new Point(2.0, 0.0)));
+    }
+
+    public function testCompareYWhenXEqual(): void
+    {
+        // x iguales → se decide por y
+        $this->assertSame(-1, Point::compare(new Point(1.0, 1.0), new Point(1.0, 2.0)));
+        $this->assertSame(1,  Point::compare(new Point(1.0, 3.0), new Point(1.0, 2.0)));
+    }
+
+    public function testCompareSymmetry(): void
+    {
+        $a = new Point(1.0, 2.0);
+        $b = new Point(3.0, 4.0);
+        $this->assertSame(-1, Point::compare($a, $b));
+        $this->assertSame(1,  Point::compare($b, $a));
+    }
+
+    // ── collinear ────────────────────────────────────────────────────────────
+
+    public function testCollinearHorizontal(): void
+    {
+        $this->assertTrue(Point::collinear(
+            new Point(0.0, 0.0),
+            new Point(1.0, 0.0),
+            new Point(2.0, 0.0)
+        ));
+    }
+
+    public function testCollinearDiagonal(): void
+    {
+        $this->assertTrue(Point::collinear(
+            new Point(0.0, 0.0),
+            new Point(1.0, 1.0),
+            new Point(2.0, 2.0)
+        ));
+    }
+
+    public function testNotCollinear(): void
+    {
+        $this->assertFalse(Point::collinear(
+            new Point(0.0, 0.0),
+            new Point(1.0, 1.0),
+            new Point(2.0, 3.0)
+        ));
+    }
+
+    public function testCollinearSamePoint(): void
+    {
+        // Tres puntos idénticos → área nula → colineales
+        $p = new Point(1.0, 1.0);
+        $this->assertTrue(Point::collinear($p, $p, $p));
+    }
+
+    // ── pointAboveOrOnLine ───────────────────────────────────────────────────
+
+    public function testPointAboveOrOnLineAbove(): void
+    {
+        // Línea horizontal y=0; punto (1,1) está encima
+        $this->assertTrue(Point::pointAboveOrOnLine(
+            new Point(1.0, 1.0),
+            new Point(0.0, 0.0),
+            new Point(2.0, 0.0)
+        ));
+    }
+
+    public function testPointAboveOrOnLineOn(): void
+    {
+        // Punto sobre la línea
+        $this->assertTrue(Point::pointAboveOrOnLine(
+            new Point(1.0, 0.0),
+            new Point(0.0, 0.0),
+            new Point(2.0, 0.0)
+        ));
+    }
+
+    public function testPointAboveOrOnLineBelow(): void
+    {
+        // Punto por debajo de la línea
+        $this->assertFalse(Point::pointAboveOrOnLine(
+            new Point(1.0, -1.0),
+            new Point(0.0, 0.0),
+            new Point(2.0, 0.0)
+        ));
+    }
+
+    // ── between ──────────────────────────────────────────────────────────────
+
+    public function testBetweenInterior(): void
+    {
+        // (1,0) está estrictamente entre (0,0) y (2,0)
+        $this->assertTrue(Point::between(
+            new Point(1.0, 0.0),
+            new Point(0.0, 0.0),
+            new Point(2.0, 0.0)
+        ));
+    }
+
+    public function testBetweenAtEndpoint(): void
+    {
+        // En los extremos no está "entre" (exclusión estricta)
+        $this->assertFalse(Point::between(
+            new Point(0.0, 0.0),
+            new Point(0.0, 0.0),
+            new Point(2.0, 0.0)
+        ));
+        $this->assertFalse(Point::between(
+            new Point(2.0, 0.0),
+            new Point(0.0, 0.0),
+            new Point(2.0, 0.0)
+        ));
+    }
+
+    public function testBetweenOffLine(): void
+    {
+        // Punto fuera de la línea → false
+        $this->assertFalse(Point::between(
+            new Point(1.0, 1.0),
+            new Point(0.0, 0.0),
+            new Point(2.0, 0.0)
+        ));
+    }
+
+    // ── linesIntersect ───────────────────────────────────────────────────────
+
+    public function testLinesIntersectCrossing(): void
+    {
+        // Dos segmentos que se cruzan en (1,1)
+        $i = Point::linesIntersect(
+            new Point(0.0, 0.0), new Point(2.0, 2.0),
+            new Point(0.0, 2.0), new Point(2.0, 0.0)
+        );
+        $this->assertNotNull($i);
+        $this->assertEqualsWithDelta(1.0, $i->point->x, 1e-9);
+        $this->assertEqualsWithDelta(1.0, $i->point->y, 1e-9);
+    }
+
+    public function testLinesIntersectParallel(): void
+    {
+        // Líneas paralelas → null
+        $i = Point::linesIntersect(
+            new Point(0.0, 0.0), new Point(1.0, 0.0),
+            new Point(0.0, 1.0), new Point(1.0, 1.0)
+        );
+        $this->assertNull($i);
+    }
+
+    public function testLinesIntersectCollinear(): void
+    {
+        // Segmentos colineales → axb ≈ 0 → null
+        $i = Point::linesIntersect(
+            new Point(0.0, 0.0), new Point(2.0, 0.0),
+            new Point(1.0, 0.0), new Point(3.0, 0.0)
+        );
+        $this->assertNull($i);
+    }
+
+    // ── getArray ─────────────────────────────────────────────────────────────
+
+    public function testGetArray(): void
+    {
+        $p = new Point(3.5, -7.0);
+        $this->assertSame([3.5, -7.0], $p->getArray());
+    }
+
+
 }
