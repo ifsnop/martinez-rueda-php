@@ -152,7 +152,7 @@ final class Point
      */
     private static function __calcAlongUsingValue(float $value)
     {
-        $eps = Algorithm::TOLERANCE;
+        $eps = Algorithm::TOLERANCE_SQRT;
         if ($value <= -$eps) {
             return -2;
         }

@@ -6,3 +6,4 @@ parameters:
         - ./src/Ifnsop/MartinezRueda/*.php
     excludePaths:
         - 'tests/*'
+        - 'vendor/*'

@@ -102,7 +102,6 @@ class Intersecter
 
     private function eventDivide(Node $ev, Point $pt): Node
     {
-
         // No dividir en los extremos: evita segmentos de longitud 0
         $seg = $ev->seg;
         if ($pt->__eq($seg->start) || $pt->__eq($seg->end)) {

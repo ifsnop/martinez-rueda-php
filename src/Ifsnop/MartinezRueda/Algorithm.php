@@ -15,7 +15,8 @@ enum Selector: string
 
 final class Algorithm
 {
-    public const TOLERANCE = 1e-12; //12; //9;
+    public const TOLERANCE = 1e-12; // 1e-8 equivale a un milímetro en la superficie terrestre
+    public const TOLERANCE_SQRT = 1e-6; // raíz cuadrada de TOLERANCE, para comparaciones de valores que ya han sido elevados al cuadrado
     public const DEBUG = false;
 
     private static function pointKey(Point $p): string
