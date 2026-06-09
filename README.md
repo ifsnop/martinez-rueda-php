@@ -45,8 +45,10 @@ php \
 
 # Improvements
 * [Speed improvement with inserts by bisection](https://github.com/velipso/polybooljs/issues/23) [Pull](https://github.com/velipso/polybooljs/pull/28)
+* Heavily optimized for speed, changed arrays with hashmaps, double-linked lists, etc.
 
 # History
 * This library is a port for PHP of [pypolybool](https://github.com/KaivnD/pypolybool)
 * Previoulsy, was a port for JS of [polybooljs](https://github.com/velipso/polybooljs)
 * Help from a .NET [port](https://github.com/idormenco/PolyBool.Net)
+
