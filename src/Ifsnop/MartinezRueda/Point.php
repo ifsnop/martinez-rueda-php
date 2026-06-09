@@ -44,7 +44,7 @@ final class Point
      * - Si point1 está después: 1
      * La comparación es primero por x, luego por y.
      */
-    public static function compare(Point $point1, Point $point2)
+    public static function compare(Point $point1, Point $point2): int
     {
         $eps = Algorithm::TOLERANCE;
         $dx = $point1->x - $point2->x;
@@ -65,7 +65,7 @@ final class Point
      * de hacer el valor más pequeño, comprobar con el siguiente PR
      * https://github.com/Henry00IS/ShapeEditor/commit/5584b25914ff53a773e4517482a028aab2cd8f1e
      */
-    public static function pointAboveOrOnLine(Point $point, Point $left, Point $right)
+    public static function pointAboveOrOnLine(Point $point, Point $left, Point $right): bool
     {
 
         $rx = $right->x;
@@ -115,7 +115,7 @@ final class Point
      * Determina si dos segmentos de línea se cruzan y devuelve el punto de intersección.
      * Si son paralelos, devuelve null.
      */
-    public static function linesIntersect(Point $a0, Point $a1, Point $b0, Point $b1)
+    public static function linesIntersect(Point $a0, Point $a1, Point $b0, Point $b1): ?IntersectionPoint
     {
         $adx = $a1->x - $a0->x;
         $ady = $a1->y - $a0->y;

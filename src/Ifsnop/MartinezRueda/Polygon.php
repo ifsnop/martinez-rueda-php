@@ -23,7 +23,7 @@ final class Polygon
 		return substr($str, 0, -1);
 	}
 
-	public function getArray()
+	public function getArray(): array
 	{
 		$arr_regions = [];
 		foreach ($this->regions as $region) {
@@ -36,7 +36,7 @@ final class Polygon
 		return $arr_regions;
 	}
 
-	public function getArrayClosed()
+	public function getArrayClosed(): array
 	{
 		$arr_regions = [];
 		foreach ($this->regions as $region) {

@@ -347,7 +347,7 @@ final class Algorithm
         return self::makePolySegments($segments, $polygon->isInverted);
     }
 
-    public static function combine(PolySegments $segments1, Polysegments $segments2)
+    public static function combine(PolySegments $segments1, PolySegments $segments2): CombinedPolySegments
     {
         $segmentIntersecter = new SegmentIntersecter();
         return new CombinedPolySegments(
@@ -565,7 +565,7 @@ final class Algorithm
         return $result;
     }
 
-    public static function polygon(PolySegments $segments)
+    public static function polygon(PolySegments $segments): Polygon
     {
         // 1) Construye cadenas (como ya haces)
         $s = self::segmentChainer($segments->segments);

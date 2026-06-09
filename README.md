@@ -314,15 +314,13 @@ Cada `Node` de evento guarda una referencia directa al `SkipNode` que lo contien
 | # | Mejora | Impacto | Complejidad |
 |---|---|---|---|
 | 1 | Cache de `pointKey` en `Point` | Rendimiento (CPU) | Baja |
-| 2 | Corrección de typo en `combine()` (`Polysegments` vs `PolySegments`) | Corrección de bug | Muy baja |
-| 3 | Parámetro `$precision` ignorado en `ringKey` / `polygonKey` | Corrección de bug | Baja |
-| 4 | `removeColinearPointsFromPolygon` no usa tolerancia correcta | Corrección numérica | Baja |
-| 5 | `__splitRegionAtDuplicates` es O(n²) recursivo; puede ser O(n) | Rendimiento | Media |
-| 6 | Método público `combine()` sin tipo de retorno declarado | Calidad de código | Muy baja |
-| 7 | `__operate` usa `CombinedPolySegments` innecesariamente | Simplificación | Baja |
-| 8 | `intersectionMany`, `differenceMany`, `xorMany` ausentes | Funcionalidad | Media |
-| 9 | `GJTools::buildGeometryFromCoordinates` llama a `json_decode` sobre un array | Bug potencial | Baja |
-| 10 | Ausencia de tipos de retorno en varios métodos públicos | Calidad de código | Baja |
+| 2 | Parámetro `$precision` ignorado en `ringKey` / `polygonKey` | Corrección de bug | Baja |
+| 3 | `removeColinearPointsFromPolygon` no usa tolerancia correcta | Corrección numérica | Baja |
+| 4 | `__splitRegionAtDuplicates` es O(n²) recursivo; puede ser O(n) | Rendimiento | Media |
+| 5 | Método público `combine()` sin tipo de retorno declarado | Calidad de código | Muy baja |
+| 6 | `__operate` usa `CombinedPolySegments` innecesariamente | Simplificación | Baja |
+| 7 | `intersectionMany`, `differenceMany`, `xorMany` ausentes | Funcionalidad | Media |
+| 8 | `GJTools::buildGeometryFromCoordinates` llama a `json_decode` sobre un array | Bug potencial | Baja |
 
 ## Profiling
 
