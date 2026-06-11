@@ -18,11 +18,13 @@ final class Algorithm
     public const TOLERANCE = 1e-12; // 1e-8 equivale a un milímetro en la superficie terrestre
     public const TOLERANCE_SQRT = 1e-6; // raíz cuadrada de TOLERANCE, para comparaciones de valores que ya han sido elevados al cuadrado
     public const DEBUG = false;
+    public const TOLERANCE_INV = 1.0 / Algorithm::TOLERANCE;
 
     private static function pointKey(Point $p): string
     {
-        $inv = 1.0 / Algorithm::TOLERANCE;
-        return (int)round($p->x * $inv) . ',' . (int)round($p->y * $inv);
+        if ($p->_cachedKey !== null) { return $p->_cachedKey;}
+        $p->_cachedKey = (int)round($p->x * Algorithm::TOLERANCE_INV) . ',' . (int)round($p->y * Algorithm::TOLERANCE_INV);
+        return $p->_cachedKey;
     }
 
     /**
@@ -652,7 +654,7 @@ final class Algorithm
                 }
             }
         }
-
+    
         // Si no hay puntos repetidos internos, devolver el anillo tal cual
         return [$ring];
     }

@@ -9,6 +9,7 @@ final class Point
     /* Coordenadas privadas del punto */
     public float $x;
     public float $y;
+    public ?string $_cachedKey = null;
 
     /* Constructor: inicializa el punto con coordenadas x e y (tipo float) */
     public function __construct(float $x, float $y)

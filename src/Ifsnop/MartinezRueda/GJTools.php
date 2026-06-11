@@ -296,6 +296,14 @@ final class GJTools
             // Calcula el área del triángulo (doble)
             $area = abs(($x2 - $x1) * ($y3 - $y1) - ($y2 - $y1) * ($x3 - $x1));
 
+            // Probar
+            // $len2 = ($x2 - $x1) ** 2 + ($y2 - $y1) ** 2;
+            // $len  = sqrt(max($len2, 1e-30));
+            // // Comparar el seno del ángulo: area / len < TOLERANCE_SQRT  (sin θ < ε)
+            // if ($area > Algorithm::TOLERANCE_SQRT * $len) {
+            //    $cleaned[] = $a;
+            // }
+
             // Si el área es mayor que epsilon, B no es colineal
             if ($area > Algorithm::TOLERANCE) {
                 $cleaned[] = $a;
@@ -388,7 +396,11 @@ final class GJTools
     private static function ringKey(array $ring, ?int $precision): string
     {
         // ringCanonical ya asegura redondeo y rotación si se llamó antes;
-        // aquí asumimos que $ring ya está canónico.
+        // aquí asumimos que $ring ya está canónico, pero si se pasa precision,
+        // redondeamos de nuevo para asegurar que la clave refleje ese redondeo.
+        if ($precision !== null) {
+           $ring = self::roundRing($ring, $precision);
+    }
         return json_encode($ring, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
@@ -548,10 +560,15 @@ final class GJTools
     {
         if (is_array($coordinatesJson)) {
             $type = self::detectGeometryTypeFromCoordinatesArray($coordinatesJson);
+            $coords = $coordinatesJson;
         } else {
             $type = self::detectGeometryTypeFromCoordinatesString($coordinatesJson);
+            $coords = json_decode(trim($coordinatesJson), true);
+            if ($coords === null) {
+                throw new \InvalidArgumentException('JSON inválido en buildGeometryFromCoordinates.');
+            }
         }
-        $coords = json_decode(trim($coordinatesJson), true);
+        
         return [
             'type' => $type,
             'coordinates' => $coords,
