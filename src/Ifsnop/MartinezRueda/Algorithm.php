@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-enum Selector: string
-{
-    case Union          = 'selectUnion';
-    case Intersect      = 'selectIntersect';
-    case Difference     = 'selectDifference';
-    case DifferenceRev  = 'selectDifferenceRev';
-    case Xor            = 'selectXor';
+enum Selector {
+    case Union;
+    case Intersect;
+    case Difference;
+    case Xor;
 }
+
 
 final class Algorithm
 {
@@ -167,7 +166,7 @@ final class Algorithm
     /**
      * Crea una cadena de segmentos a partir de un array de segmentos.
      */
-    public static function segmentChainer(array $segments): array
+    private static function segmentChainer(array $segments): array
     {
         $regions   = [];
         $chains    = [];   // id => Point[]
@@ -394,11 +393,6 @@ final class Algorithm
                 $a->isInverted && !$b->isInverted
             ),
 
-            'differenceRev' => self::makePolySegments(
-                self::__selectLogical($combined, fn(bool $A, bool $B) => $B && !$A),
-                !$a->isInverted && $b->isInverted
-            ),
-
             'xor' => self::makePolySegments(
                 self::__selectLogical($combined, fn(bool $A, bool $B) => $A xor $B),
                 $a->isInverted != $b->isInverted
@@ -466,19 +460,6 @@ final class Algorithm
         }
 
         return self::combineSelect($a, $b, 'difference');
-    }
-
-    private static function differenceRevSegments(PolySegments $a, PolySegments $b): PolySegments
-    {
-        if (
-            !$a->isInverted &&
-            !$b->isInverted &&
-            !self::boundsOverlap($a->bounds, $b->bounds)
-        ) {
-            return $b;
-        }
-
-        return self::combineSelect($a, $b, 'differenceRev');
     }
 
     private static function reduceBalanced(array $items, callable $op): PolySegments
@@ -578,7 +559,8 @@ final class Algorithm
         return $p;
     }
 
-    public static function __operate(
+    /*
+        public static function __operate(
         Polygon $polygon1,
         Polygon $polygon2,
         Selector $selector
@@ -588,8 +570,24 @@ final class Algorithm
         $selectedSegments = self::$method($combinedSegments);
         return self::polygon($selectedSegments);
     }
+    */
+    // cmobine se convierte en dead code?
+    private static function __operate(Polygon $polygon1, Polygon $polygon2, Selector $selector): Polygon
+    {
+        $a = self::segments($polygon1);
+        $b = self::segments($polygon2);
 
-    public static function splitSelfTouchingRegions(array $regions): array
+        $selected = match ($selector) {
+            Selector::Union        => self::unionSegments($a, $b),
+            Selector::Intersect    => self::intersectSegments($a, $b),
+            Selector::Difference   => self::differenceSegments($a, $b),
+            Selector::Xor          => self::xorSegments($a, $b),
+        };
+
+        return self::polygon($selected);
+    }
+
+    private static function splitSelfTouchingRegions(array $regions): array
     {
         // Recorre cada región (anillo) y parte si hay puntos repetidos
         $out = [];
@@ -671,19 +669,9 @@ final class Algorithm
         return self::__operate($polygon1, $polygon2, Selector::Intersect);
     }
 
-    public static function intersection(Polygon $polygon1, Polygon $polygon2): Polygon
-    {
-        return self::intersect($polygon1, $polygon2);
-    }
-
     public static function difference(Polygon $polygon1, Polygon $polygon2): Polygon
     {
         return self::__operate($polygon1, $polygon2, Selector::Difference);
-    }
-
-    public static function differenceRev(Polygon $polygon1, Polygon $polygon2): Polygon
-    {
-        return self::__operate($polygon1, $polygon2, Selector::DifferenceRev);
     }
 
     public static function xoring(Polygon $polygon1, Polygon $polygon2): Polygon
@@ -786,19 +774,6 @@ final class Algorithm
         return new PolySegments(
             segments: $segments,
             isInverted: ($combinedPolySegments->isInverted1 && !$combinedPolySegments->isInverted2)
-        );
-    }
-
-    public static function selectDifferenceRev(CombinedPolySegments $combinedPolySegments): PolySegments
-    {
-        // B \ A  ⇒  inside = B && !A
-        $segments = self::__selectLogical(
-            $combinedPolySegments->combined,
-            fn(bool $A, bool $B) => ($B && !$A)
-        );
-        return new PolySegments(
-            segments: $segments,
-            isInverted: (!$combinedPolySegments->isInverted1 && $combinedPolySegments->isInverted2)
         );
     }
 
