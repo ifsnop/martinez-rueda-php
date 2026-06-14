@@ -559,34 +559,6 @@ final class Algorithm
         return $p;
     }
 
-    /*
-        public static function __operate(
-        Polygon $polygon1,
-        Polygon $polygon2,
-        Selector $selector
-    ): Polygon {
-        $method           = $selector->value;
-        $combinedSegments = self::combine(self::segments($polygon1), self::segments($polygon2));
-        $selectedSegments = self::$method($combinedSegments);
-        return self::polygon($selectedSegments);
-    }
-    */
-    // cmobine se convierte en dead code?
-    private static function __operate(Polygon $polygon1, Polygon $polygon2, Selector $selector): Polygon
-    {
-        $a = self::segments($polygon1);
-        $b = self::segments($polygon2);
-
-        $selected = match ($selector) {
-            Selector::Union        => self::unionSegments($a, $b),
-            Selector::Intersect    => self::intersectSegments($a, $b),
-            Selector::Difference   => self::differenceSegments($a, $b),
-            Selector::Xor          => self::xorSegments($a, $b),
-        };
-
-        return self::polygon($selected);
-    }
-
     private static function splitSelfTouchingRegions(array $regions): array
     {
         // Recorre cada región (anillo) y parte si hay puntos repetidos
@@ -661,22 +633,30 @@ final class Algorithm
 
     public static function union(Polygon $polygon1, Polygon $polygon2): Polygon
     {
-        return self::__operate($polygon1, $polygon2, Selector::Union);
+        return self::polygon(
+            self::unionSegments(self::segments($polygon1), self::segments($polygon2))
+        );
     }
 
     public static function intersect(Polygon $polygon1, Polygon $polygon2): Polygon
     {
-        return self::__operate($polygon1, $polygon2, Selector::Intersect);
+        return self::polygon(
+            self::intersectSegments(self::segments($polygon1), self::segments($polygon2))
+        );
     }
 
     public static function difference(Polygon $polygon1, Polygon $polygon2): Polygon
     {
-        return self::__operate($polygon1, $polygon2, Selector::Difference);
+        return self::polygon(
+            self::differenceSegments(self::segments($polygon1), self::segments($polygon2))
+        );
     }
 
     public static function xoring(Polygon $polygon1, Polygon $polygon2): Polygon
     {
-        return self::__operate($polygon1, $polygon2, Selector::Xor);
+        return self::polygon(
+            self::xorSegments(self::segments($polygon1), self::segments($polygon2))
+        );
     }
 
     // ── Operaciones n-arias (array de polígonos) ──────────────────────────────
@@ -686,21 +666,69 @@ final class Algorithm
         if (count($polygons) === 0) {
             throw new \InvalidArgumentException('unionMany requires at least one polygon.');
         }
-        /*
-        $firstSegments = self::segments($polygons[0]);
-        for ($i = 1; $i < count($polygons); $i++) {
-            $combined      = self::combine($firstSegments, self::segments($polygons[$i]));
-            $firstSegments = self::selectUnion($combined);
+        if (count($polygons) === 1) {
+            return $polygons[0]; // identidad
         }
-        return self::polygon($firstSegments);
-        */
         $items = self::polygonsToSegments($polygons);
-
         $result = self::reduceBalanced(
             $items,
             fn(PolySegments $a, PolySegments $b) => self::unionSegments($a, $b)
         );
 
+        return self::polygon($result);
+    }
+
+    public static function intersectMany(array $polygons): Polygon
+    {
+        if (count($polygons) === 0) {
+            throw new \InvalidArgumentException('intersectMany requires at least one polygon.');
+        }
+        if (count($polygons) === 1) {
+            return $polygons[0];
+        }
+        $items = self::polygonsToSegments($polygons);
+        $result = self::reduceBalanced(
+            $items,
+            fn(PolySegments $a, PolySegments $b) => self::intersectSegments($a, $b)
+        );
+        return self::polygon($result);
+    }
+
+    public static function xorMany(array $polygons): Polygon
+    {
+        if (count($polygons) === 0) {
+            throw new \InvalidArgumentException('xorMany requires at least one polygon.');
+        }
+        if (count($polygons) === 1) {
+            return $polygons[0];
+        }
+        $items = self::polygonsToSegments($polygons);
+        $result = self::reduceBalanced(
+            $items,
+            fn(PolySegments $a, PolySegments $b) => self::xorSegments($a, $b)
+        );
+        return self::polygon($result);
+    }
+
+    public static function differenceMany(array $polygons): Polygon
+    {
+        // Nota importante para differenceMany: polygonsToSegments no debe usarse aquí porque
+        // ordena el array por bounding box. Para difference el orden es semánticamente
+        // significativo (el primer polígono es el sujeto). Hay que convertir los
+        // Polygon → PolySegments preservando el orden original — por eso el código anterior
+        // llama a self::segments() dentro del bucle en lugar de pre-calcular todo.
+        $n = count($polygons);
+        if ($n === 0) {
+            throw new \InvalidArgumentException('differenceMany requires at least one polygon.');
+        }
+        if ($n === 1) {
+            return $polygons[0];
+        }
+        // ((subject \ mask1) \ mask2) \ ...
+        $result = self::segments($polygons[0]);
+        for ($i = 1; $i < $n; $i++) {
+            $result = self::differenceSegments($result, self::segments($polygons[$i]));
+        }
         return self::polygon($result);
     }
 
