@@ -181,7 +181,8 @@ final class EventList
     {
         $hPt      = $here->pt;
         $hOther   = $here->other;           // ← una sola desreferencia
-        $hOtherPt = $hOther !== null ? $hOther->pt : $here->pt; // defensivo
+        // $hOtherPt = $hOther !== null ? $hOther->pt : $here->pt; // defensivo
+        $hOtherPt = $hOther !== null ? $hOther->pt : throw new \LogicException('BUG: event with null other in queue'); // muy defensivo
         $hIsStart = $here->isStart;
 
         $comp = Point::compare($p11, $hPt);
