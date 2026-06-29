@@ -32,9 +32,4 @@ final class RegionIntersecter extends Intersecter
             $this->eventAddSegment($segment, true);
         }
     }
-
-    public function calculate2(bool $isInverted)
-    {
-        return parent::calculate($isInverted, false);
-    }
 }

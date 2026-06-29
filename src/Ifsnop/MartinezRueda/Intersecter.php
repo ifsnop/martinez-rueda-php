@@ -29,39 +29,29 @@ class Intersecter
         );
     }
 
-    private function eventAdd(Node $ev, Point $otherPt): void
-    {
-        $this->eventRoot->insertBefore($ev, $otherPt);
-    }
-
     private function eventAddSegmentStart(Segment $segment, bool $primary): Node
     {
-        $evStart = StatusList::node(
-            new Node(
-                isStart: true,
-                pt: $segment->start,
-                seg: $segment,
-                primary: $primary
-            )
+        $evStart = new Node(
+            isStart: true,
+            pt: $segment->start,
+            seg: $segment,
+            primary: $primary
         );
-        $this->eventAdd($evStart, $segment->end);
-
+        $this->eventRoot->insertBefore($evStart, $segment->end);
         return $evStart;
     }
 
     private function eventAddSegmentEnd(Node $evStart, Segment $segment, bool $primary): void
     {
-        $evEnd = StatusList::node(
-            new Node(
+        $evEnd = new Node(
                 isStart: false,
                 pt: $segment->end,
                 seg: $segment,
                 primary: $primary,
                 other: $evStart
-            )
         );
         $evStart->other = $evEnd;
-        $this->eventAdd($evEnd, $evStart->pt);
+        $this->eventRoot->insertBefore($evEnd, $evStart->pt);
     }
 
     public function eventAddSegment(Segment $segment, bool $primary): Node
@@ -97,7 +87,7 @@ class Intersecter
         $ev->seg->end = $end;
         $ev->seg->recalcBounds();
         $ev->other->pt = $end;
-        $this->eventAdd($ev->other, $ev->pt);
+        $this->eventRoot->insertBefore($ev->other, $ev->pt);
     }
 
     private function eventDivide(Node $ev, Point $pt): Node
@@ -113,11 +103,6 @@ class Intersecter
         $ns = $this->segmentCopy($pt, $seg->end, $seg);
         $this->eventUpdateEnd($ev, $pt);
         return $this->eventAddSegment($ns, $ev->primary);
-    }
-
-    private function statusFindSurrounding(StatusList $statusRoot, Node $ev): Transition
-    {
-        return $statusRoot->findTransition($ev);
     }
 
     // Nota: -2/+2 significan que la proyección cae fuera del segmento lejos del extremo.
@@ -177,9 +162,10 @@ class Intersecter
                 }
                 $this->eventDivide($ev2, $a1);
             }
-        } else { // $i != null
-            if ($i->alongA === 0) {
-                if ($i->alongB === -1) {
+        } else { // $i != null [$iAlongA, $iAlongB, $iPt] = $i
+            [$iAlongA, $iAlongB, $iPt] = $i;
+            if ($iAlongA === 0) {
+                if ($iAlongB === -1) {
                     if (Point::compare($b1, $a1) > 0) {
                         $this->eventDivide($ev1, $b1);
                     } else {
@@ -189,14 +175,14 @@ class Intersecter
                             $this->eventDivide($ev2, $a1);
                         }
                     }
-                } elseif ($i->alongB === 0) {
-                    $this->eventDivide($ev1, $i->point);
-                } elseif ($i->alongB === 1) {
+                } elseif ($iAlongB === 0) {
+                    $this->eventDivide($ev1, $iPt);
+                } elseif ($iAlongB === 1) {
                     $this->eventDivide($ev1, $b2);
                 }
             }
-            if ($i->alongB === 0) {
-                if ($i->alongA === -1) {
+            if ($iAlongB === 0) {
+                if ($iAlongA === -1) {
                     if (Point::compare($a1, $b1) > 0) {
                         $this->eventDivide($ev2, $a1);
                     } else {
@@ -206,9 +192,9 @@ class Intersecter
                             $this->eventDivide($ev1, $b1);
                         }
                     }
-                } elseif ($i->alongA === 0) {
-                    $this->eventDivide($ev2, $i->point);
-                } elseif ($i->alongA === 1) {
+                } elseif ($iAlongA === 0) {
+                    $this->eventDivide($ev2, $iPt);
+                } elseif ($iAlongA === 1) {
                     $this->eventDivide($ev2, $a2);
                 }
             }
@@ -231,7 +217,6 @@ class Intersecter
     {
         $statusRoot = new StatusList();
         $segments = [];
-
         while (!$this->eventRoot->isEmpty()) {
             $ev = $this->eventRoot->getHead();
             if ($ev->isStart) {
@@ -241,14 +226,11 @@ class Intersecter
                         "PolyBool: Zero-length segment detected during processing; check input/TOLERANCE"
                     );
                 }
-
-                $surrounding = $this->statusFindSurrounding($statusRoot, $ev);
-                $above = $surrounding->before !== null ? $surrounding->before->ev : null;
-                $below = $surrounding->after !== null ? $surrounding->after->ev : null;
-
+                [$surroundBefore, $surroundAfter] = $statusRoot->findTransition($ev);
+                $above = $surroundBefore !== null ? $surroundBefore->ev : null;
+                $below = $surroundAfter !== null ? $surroundAfter->ev : null;
                 $eve = $this->checkBothIntersections($above, $ev, $below);
                 if ($eve !== null) {
-
                     if ($this->selfIntersection) {
                         $toggle = false;
                         if ($ev->seg->myFill->below === null) {
@@ -256,7 +238,6 @@ class Intersecter
                         } else {
                             $toggle = $ev->seg->myFill->above !== $ev->seg->myFill->below;
                         }
-
                         if ($toggle) {
                             $eve->seg->myFill->above = !$eve->seg->myFill->above;
                         }
@@ -266,47 +247,40 @@ class Intersecter
                     $this->eventRoot->remove($ev->other);
                     $this->eventRoot->remove($ev);
                 }
-
                 if ($this->eventRoot->getHead() !== $ev) {
                     continue;
                 }
-
                 if ($this->selfIntersection) {
                     $toggle = false;
                     $seg = $ev->seg;
                     $mf = $seg->myFill;
-                    if ($seg === null || $mf === null || $mf->below === null) {
+                    if ($mf->below === null) {
                         $toggle = true;
                     } else {
                         $toggle = $mf->above !== $mf->below;
                     }
-
                     if ($below === null) {
                         $mf->below = $primaryPolyInverted;
                     } else {
                         $mf->below = $below->seg->myFill->above;
                     }
-
                     if ($toggle) {
                         $mf->above = !$mf->below;
                     } else {
                         $mf->above = $mf->below;
                     }
                 } else { // !$this->selfIntersection
-
                     // Evitar utilizar sementos no inicializados
                     if ($ev->seg->myFill === null) {
                         $ev->seg->myFill = new Fill();
                     }
-
                     if ($ev->seg->myFill->below === null || $ev->seg->myFill->above === null) {
                         // Buscar el vecino inferior del MISMO polígono en el status
                         $sameBelowEv = null;
-                        $cursor = $surrounding->after; // nodo de StatusList (no el ev)
+                        $cursor = $surroundAfter; // StatusEntry (no el ev)
                         while ($cursor !== null) {
-                            $curEv = $cursor->ev;
-                            if ($curEv !== null && $curEv->primary === $ev->primary) {
-                                $sameBelowEv = $curEv;
+                            if ($cursor->ev->primary === $ev->primary) {
+                                $sameBelowEv = $cursor->ev;
                                 break;
                             }
                             $cursor = $cursor->next;
@@ -321,7 +295,6 @@ class Intersecter
                         $ev->seg->myFill->above = !$belowInsideOwn;
                     }
                     // 2) Asegurar otherFill (interior respecto al otro polígono), como ya hacías
-
                     if ($ev->seg->otherFill === null) {
                         $inside = false;
                         if ($below === null) {
@@ -337,12 +310,10 @@ class Intersecter
                                 $inside = (bool)$below->seg->myFill->above;
                             }
                         }
-
                         $ev->seg->otherFill = new Fill($inside, $inside);
                     }
                 }
-
-                $ev->other->status = $statusRoot->insert($ev, StatusList::node(new Node(ev: $ev)));
+                $ev->other->status = $statusRoot->insert($ev);
             } else { // !$ev->isStart
                 $st = $ev->status;
                 // en lugar de lanzar simplemente la excepcion, comprobamos si hubo un problema al tratar
@@ -357,7 +328,6 @@ class Intersecter
                     $this->checkIntersection($st->previous->ev, $st->next->ev);
                 }
                 $statusRoot->remove($st);
-
                 if (!$ev->primary) {
                     $s = $ev->seg->myFill;
                     $ev->seg->myFill = $ev->seg->otherFill;

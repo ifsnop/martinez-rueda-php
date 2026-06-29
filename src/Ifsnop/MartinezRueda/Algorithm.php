@@ -4,14 +4,6 @@ declare(strict_types=1);
 
 namespace Ifsnop\MartinezRueda;
 
-enum Selector {
-    case Union;
-    case Intersect;
-    case Difference;
-    case Xor;
-}
-
-
 final class Algorithm
 {
     public const TOLERANCE = 1e-12; // 1e-8 equivale a un milímetro en la superficie terrestre
@@ -21,7 +13,9 @@ final class Algorithm
 
     private static function pointKey(Point $p): string
     {
-        if ($p->_cachedKey !== null) { return $p->_cachedKey;}
+        if ($p->_cachedKey !== null) {
+            return $p->_cachedKey;
+        }
         $p->_cachedKey = (int)round($p->x * Algorithm::TOLERANCE_INV) . ',' . (int)round($p->y * Algorithm::TOLERANCE_INV);
         return $p->_cachedKey;
     }
@@ -335,7 +329,7 @@ final class Algorithm
     }
 
     // core API
-    public static function segments(Polygon$polygon): PolySegments
+    public static function segments(Polygon $polygon): PolySegments
     {
         $regionIntersecter = new RegionIntersecter();
 
@@ -343,24 +337,21 @@ final class Algorithm
             $regionIntersecter->addRegion($region);
         }
 
-        $segments = $regionIntersecter->calculate2($polygon->isInverted);
+        $segments = $regionIntersecter->calculate($polygon->isInverted, false);
 
         return self::makePolySegments($segments, $polygon->isInverted);
     }
 
-    public static function combine(PolySegments $segments1, PolySegments $segments2): CombinedPolySegments
+        public static function combine(PolySegments $segments1, PolySegments $segments2): array
     {
-        $segmentIntersecter = new SegmentIntersecter();
-        return new CombinedPolySegments(
-            $segmentIntersecter->calculate2(
-                $segments1->segments,
-                $segments1->isInverted,
-                $segments2->segments,
-                $segments2->isInverted
-            ),
-            $segments1->isInverted,
-            $segments2->isInverted
-        );
+        $si = new Intersecter(false);
+        foreach ($segments1->segments as $seg) {
+            $si->eventAddSegment($si->segmentCopy($seg->start, $seg->end, $seg), true);
+        }
+        foreach ($segments2->segments as $seg) {
+            $si->eventAddSegment($si->segmentCopy($seg->start, $seg->end, $seg), false);
+        }
+        return $si->calculate($segments1->isInverted, $segments2->isInverted);
     }
 
     private static function combineSelect(
@@ -368,36 +359,31 @@ final class Algorithm
         PolySegments $b,
         string $operation
     ): PolySegments {
-        $segmentIntersecter = new SegmentIntersecter();
-
-        $combined = $segmentIntersecter->calculate2(
-            $a->segments,
-            $a->isInverted,
-            $b->segments,
-            $b->isInverted
-        );
-
+        $si = new Intersecter(false);
+        foreach ($a->segments as $seg) {
+            $si->eventAddSegment($si->segmentCopy($seg->start, $seg->end, $seg), true);
+        }
+        foreach ($b->segments as $seg) {
+            $si->eventAddSegment($si->segmentCopy($seg->start, $seg->end, $seg), false);
+        }
+        $combined = $si->calculate($a->isInverted, $b->isInverted);
         return match ($operation) {
             'union' => self::makePolySegments(
                 self::__selectUnionLogical($combined),
                 $a->isInverted || $b->isInverted
             ),
-
             'intersect' => self::makePolySegments(
                 self::__selectLogical($combined, fn(bool $A, bool $B) => $A && $B),
                 $a->isInverted && $b->isInverted
             ),
-
             'difference' => self::makePolySegments(
                 self::__selectLogical($combined, fn(bool $A, bool $B) => $A && !$B),
                 $a->isInverted && !$b->isInverted
             ),
-
             'xor' => self::makePolySegments(
                 self::__selectLogical($combined, fn(bool $A, bool $B) => $A xor $B),
                 $a->isInverted != $b->isInverted
             ),
-
             default => throw new \InvalidArgumentException("Operación no soportada: $operation"),
         };
     }
@@ -624,7 +610,7 @@ final class Algorithm
                 }
             }
         }
-    
+
         // Si no hay puntos repetidos internos, devolver el anillo tal cual
         return [$ring];
     }
@@ -768,53 +754,32 @@ final class Algorithm
         return $result;
     }
 
-    public static function selectUnion(CombinedPolySegments $combinedPolySegments): PolySegments
+    public static function selectUnion(array $combined, bool $inv1, bool $inv2): PolySegments
     {
-        $segments = self::__selectLogical(
-            $combinedPolySegments->combined,
-            fn(bool $A, bool $B) => ($A || $B)
-        );
-        return new PolySegments(
-            segments: $segments,
-            isInverted: ($combinedPolySegments->isInverted1 || $combinedPolySegments->isInverted2)
+        return self::makePolySegments(
+            self::__selectLogical($combined, fn(bool $A, bool $B) => ($A || $B)),
+            $inv1 || $inv2
         );
     }
-
-    public static function selectIntersect(CombinedPolySegments $combinedPolySegments): PolySegments
+    public static function selectIntersect(array $combined, bool $inv1, bool $inv2): PolySegments
     {
-        $segments = self::__selectLogical(
-            $combinedPolySegments->combined,
-            fn(bool $A, bool $B) => ($A && $B)
-        );
-        return new PolySegments(
-            segments: $segments,
-            isInverted: ($combinedPolySegments->isInverted1 && $combinedPolySegments->isInverted2)
+        return self::makePolySegments(
+            self::__selectLogical($combined, fn(bool $A, bool $B) => ($A && $B)),
+            $inv1 && $inv2
         );
     }
-
-    public static function selectDifference(CombinedPolySegments $combinedPolySegments): PolySegments
+    public static function selectDifference(array $combined, bool $inv1, bool $inv2): PolySegments
     {
-        // A \ B  ⇒  inside = A && !B
-        $segments = self::__selectLogical(
-            $combinedPolySegments->combined,
-            fn(bool $A, bool $B) => ($A && !$B)
-        );
-        return new PolySegments(
-            segments: $segments,
-            isInverted: ($combinedPolySegments->isInverted1 && !$combinedPolySegments->isInverted2)
+        return self::makePolySegments(
+            self::__selectLogical($combined, fn(bool $A, bool $B) => ($A && !$B)),
+            $inv1 && !$inv2
         );
     }
-
-    public static function selectXor(CombinedPolySegments $combinedPolySegments): PolySegments
+    public static function selectXor(array $combined, bool $inv1, bool $inv2): PolySegments
     {
-        // XOR  ⇒  inside = A xor B
-        $segments = self::__selectLogical(
-            $combinedPolySegments->combined,
-            fn(bool $A, bool $B) => ($A xor $B)
-        );
-        return new PolySegments(
-            segments: $segments,
-            isInverted: ($combinedPolySegments->isInverted1 != $combinedPolySegments->isInverted2)
+        return self::makePolySegments(
+            self::__selectLogical($combined, fn(bool $A, bool $B) => ($A xor $B)),
+            $inv1 != $inv2
         );
     }
 }

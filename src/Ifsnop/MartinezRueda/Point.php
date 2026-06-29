@@ -94,9 +94,8 @@ final class Point
         $apx = $p->x - $a->x;
         $apy = $p->y - $a->y;
         $eps = Algorithm::TOLERANCE;
-
-
         $sqlen = $abx * $abx + $aby * $aby;
+
         if ($sqlen == 0.0) return false;
         $len = sqrt($sqlen);
 
@@ -112,11 +111,13 @@ final class Point
         return ($t > 0.0 + $tTol) && ($t < 1.0 - $tTol);
     }
 
-    /*
+    /**
      * Determina si dos segmentos de línea se cruzan y devuelve el punto de intersección.
      * Si son paralelos, devuelve null.
+     * 
+     * @return array{0:int,1:int,2:Point}|null [alongA, alongB, point]
      */
-    public static function linesIntersect(Point $a0, Point $a1, Point $b0, Point $b1): ?IntersectionPoint
+    public static function linesIntersect(Point $a0, Point $a1, Point $b0, Point $b1): ?array
     {
         $adx = $a1->x - $a0->x;
         $ady = $a1->y - $a0->y;
@@ -134,13 +135,12 @@ final class Point
 
         $a = ($bdx * $dy - $bdy * $dx) / $axb;
         $b = ($adx * $dy - $ady * $dx) / $axb;
-
-        return new IntersectionPoint(
+        return [
             self::__calcAlongUsingValue($a),
             self::__calcAlongUsingValue($b),
-            new Point($a0->x + $a * $adx, $a0->y + $a * $ady)
-        );
-    }
+            new Point($a0->x + $a * $adx, $a0->y + $a * $ady),
+        ];
+     }
 
     /*
      * Método auxiliar que clasifica un valor dentro de un rango normalizado [0, 1]

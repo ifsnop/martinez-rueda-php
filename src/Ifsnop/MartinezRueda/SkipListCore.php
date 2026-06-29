@@ -48,7 +48,7 @@ trait SkipListCore
      *
      * @param array<int,SkipNode> $update
      */
-    private function linkAt(array &$update, Node $value): SkipNode
+    private function linkAt(array &$update, mixed $value): SkipNode
     {
         $h = $this->randomLevel();
         if ($h > $this->level) {

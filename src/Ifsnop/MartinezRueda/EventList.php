@@ -134,7 +134,7 @@ final class EventList
         // Back-pointer al SkipNode en lugar de un closure por nodo: borrado en
         // O(altura) vía remove() sin asignar un Closure (ni binding de $this) por
         // cada evento insertado. Menos memoria y menos presión de GC en el camino crítico.
-        $ev->snode = $this->linkAt($update, $ev);
+        $ev->evSnode = $this->linkAt($update, $ev);
     }
 
     /**
@@ -145,9 +145,9 @@ final class EventList
      */
     public function remove(Node $ev): void
     {
-        if ($ev->snode !== null) {
-            $this->unlink($ev->snode);
-            $ev->snode = null;
+        if ($ev->evSnode !== null) {
+            $this->unlink($ev->evSnode);
+            $ev->evSnode = null;
         }
     }
 
@@ -156,7 +156,6 @@ final class EventList
      * Avanza mientras el nodo existente NO deba ir detrás del insertado
      * (es decir, mientras el existente precede al insertado).
      *
-     * @return array<int,SkipNode>
      */
     private function searchEvent(Point $p11, Point $p12, bool $p1IsStart): array
     {

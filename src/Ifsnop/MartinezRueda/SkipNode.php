@@ -11,14 +11,12 @@ namespace Ifsnop\MartinezRueda;
 
 final class SkipNode
 {
-    public ?Node $value;
+    public mixed $value;
     public int   $height;
-    /** @var array<int,?SkipNode> punteros hacia delante por nivel */
     public array $next;
-    /** @var array<int,?SkipNode> punteros hacia atrás por nivel */
     public array $prev;
 
-    public function __construct(?Node $value, int $height)
+    public function __construct(mixed $value, int $height)
     {
         $this->value  = $value;
         $this->height = $height;
