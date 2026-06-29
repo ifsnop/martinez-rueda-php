@@ -126,12 +126,13 @@ final class PointTest extends TestCase
         $b0 = new Point(5.0, -5.0);
         $b1 = new Point(5.0,  5.0);
 
+        // linesIntersect devuelve array [alongA, alongB, Point] o null
         $ip = Point::linesIntersect($a0, $a1, $b0, $b1);
         $this->assertNotNull($ip, 'Debe intersectar como líneas');
 
-        $this->assertSame(0, $ip->alongA); // a = 0.5 ⇒ interior
-        $this->assertSame(0, $ip->alongB); // b = 0.5 ⇒ interior
-        $this->assertEquals([5.0, 0.0], $ip->point->getArray());
+        $this->assertSame(0, $ip[0]); // alongA: a = 0.5 ⇒ interior
+        $this->assertSame(0, $ip[1]); // alongB: b = 0.5 ⇒ interior
+        $this->assertEquals([5.0, 0.0], $ip[2]->getArray());
     }
 
     public function testLinesIntersectAtAStartAndAEnd(): void
@@ -144,18 +145,18 @@ final class PointTest extends TestCase
         $b1 = new Point(0.0,  1.0);
         $ipStart = Point::linesIntersect($a0, $a1, $b0, $b1);
         $this->assertNotNull($ipStart);
-        $this->assertSame(-1, $ipStart->alongA);
-        $this->assertSame( 0, $ipStart->alongB);
-        $this->assertEquals([0.0, 0.0], $ipStart->point->getArray());
+        $this->assertSame(-1, $ipStart[0]); // alongA
+        $this->assertSame( 0, $ipStart[1]); // alongB
+        $this->assertEquals([0.0, 0.0], $ipStart[2]->getArray());
 
         // Cruza exactamente en el final de A (a=1 ⇒ alongA=1)
         $c0 = new Point(10.0, -1.0);
         $c1 = new Point(10.0,  1.0);
         $ipEnd = Point::linesIntersect($a0, $a1, $c0, $c1);
         $this->assertNotNull($ipEnd);
-        $this->assertSame(1,  $ipEnd->alongA);
-        $this->assertSame(0,  $ipEnd->alongB);
-        $this->assertEquals([10.0, 0.0], $ipEnd->point->getArray());
+        $this->assertSame(1, $ipEnd[0]); // alongA
+        $this->assertSame(0, $ipEnd[1]); // alongB
+        $this->assertEquals([10.0, 0.0], $ipEnd[2]->getArray());
     }
 
     public function testLinesIntersectOutsideSegmentAButAsLines(): void
@@ -170,9 +171,9 @@ final class PointTest extends TestCase
 
         $ip = Point::linesIntersect($a0, $a1, $b0, $b1);
         $this->assertNotNull($ip);
-        $this->assertSame(2, $ip->alongA); // fuera por el final de A
-        $this->assertSame(0, $ip->alongB); // interior de B
-        $this->assertEquals([$xBeyond, 0.0], $ip->point->getArray());
+        $this->assertSame(2, $ip[0]); // alongA: fuera por el final de A
+        $this->assertSame(0, $ip[1]); // alongB: interior de B
+        $this->assertEquals([$xBeyond, 0.0], $ip[2]->getArray());
     }
 
     public function testLinesIntersectOutsideBeforeA(): void
@@ -187,9 +188,9 @@ final class PointTest extends TestCase
 
         $ip = Point::linesIntersect($a0, $a1, $b0, $b1);
         $this->assertNotNull($ip);
--       $this->assertSame(-2, $ip->alongA);
--       $this->assertSame( 0, $ip->alongB);
-        $this->assertEqualsWithDelta([$xBefore, 0.0], $ip->point->getArray(), Algorithm::TOLERANCE);
+        $this->assertSame(-2, $ip[0]); // alongA: fuera por el inicio de A
+        $this->assertSame( 0, $ip[1]); // alongB: interior de B
+        $this->assertEqualsWithDelta([$xBefore, 0.0], $ip[2]->getArray(), Algorithm::TOLERANCE);
     }
 
     public function testLinesParallelReturnNull(): void
@@ -405,8 +406,8 @@ final class PointTest extends TestCase
             new Point(0.0, 2.0), new Point(2.0, 0.0)
         );
         $this->assertNotNull($i);
-        $this->assertEqualsWithDelta(1.0, $i->point->x, 1e-9);
-        $this->assertEqualsWithDelta(1.0, $i->point->y, 1e-9);
+        $this->assertEqualsWithDelta(1.0, $i[2]->x, 1e-9);
+        $this->assertEqualsWithDelta(1.0, $i[2]->y, 1e-9);
     }
 
     public function testLinesIntersectParallel(): void
