@@ -153,6 +153,11 @@ $test = [
 			]],
 		],
 	],
+	14 => [ // comprueba que se generan excepciones al tener datos de entrada inválidos
+		'region_a' => [[[0, 0], [0, 1], [1, 1], [1, 0]]],
+		'region_b' => [[[1, 0], [2, 0], [null, 1], [1, 1]]],
+		'res' => [ 'union' => 'Exception' ],
+	],
 ];
 
 /*
@@ -251,33 +256,42 @@ print "result 2#" . $result->numPoints . PHP_EOL;
 $fail = false;
 $debug = false;
 foreach ($test as $test_number => $test_predicates) {
-	$pa = MR\Polygon::create()->fillFromArray($test_predicates['region_a']);
-	$pb = MR\Polygon::create()->fillFromArray($test_predicates['region_b']);
-	if (isset($test_predicates['region_c'])) {
-		$pc = MR\Polygon::create()->fillFromArray($test_predicates['region_c']);
-	} else {
-		$pc = false;
-	}
 
 	foreach ($test_predicates['res'] as $op => $expected) {
-		$diff = array();
-		$pab = MR\Algorithm::$op($pa, $pb);
-		$result = $pab->getArray();
-		if ($pc)
-			$result = MR\Algorithm::$op($pab, $pc)->getArray();
-		if ($debug) print "PA" . PHP_EOL . json_encode($test_predicates['region_a']) . PHP_EOL;
-		if ($debug) print "PB" . PHP_EOL . json_encode($test_predicates['region_b']) . PHP_EOL;
-		if ($pc && $debug) print "PC" . PHP_EOL . json_encode($test_predicates['region_c']) . PHP_EOL;
 
-		if ($debug) print "RE" . PHP_EOL . json_encode($expected) . PHP_EOL;
-		if ($debug) print "RS" . PHP_EOL . json_encode($result) . PHP_EOL . PHP_EOL;
+		try {
+			$diff = array();
+			$pa = MR\Polygon::create()->fillFromArray($test_predicates['region_a']);
+			$pb = MR\Polygon::create()->fillFromArray($test_predicates['region_b']);
+			if (isset($test_predicates['region_c'])) {
+				$pc = MR\Polygon::create()->fillFromArray($test_predicates['region_c']);
+			} else {
+				$pc = false;
+			}
 
-		// soporta como entrada Polygon o MultiPolygon
-		$expected_normalized = MR\GJTools::geojsonToArray($expected);
-		if ($debug) print "RE_N" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
-		$result_normalized = MR\GJTools::geojsonToArray($result);
-		if ($debug) print "RS_N" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
-		$ret = MR\GJTools::compareCoordinates($result_normalized, $expected_normalized, $diff);
+			$pab = MR\Algorithm::$op($pa, $pb);
+			$result = $pab->getArray();
+			if ($pc)
+				$result = MR\Algorithm::$op($pab, $pc)->getArray();
+			if ($debug) print "PA" . PHP_EOL . json_encode($test_predicates['region_a']) . PHP_EOL;
+			if ($debug) print "PB" . PHP_EOL . json_encode($test_predicates['region_b']) . PHP_EOL;
+			if ($pc && $debug) print "PC" . PHP_EOL . json_encode($test_predicates['region_c']) . PHP_EOL;
+
+			if ($debug) print "RE" . PHP_EOL . json_encode($expected) . PHP_EOL;
+			if ($debug) print "RS" . PHP_EOL . json_encode($result) . PHP_EOL . PHP_EOL;
+
+			// soporta como entrada Polygon o MultiPolygon
+			$expected_normalized = MR\GJTools::geojsonToArray($expected);
+			if ($debug) print "RE_N" . PHP_EOL . json_encode($expected_normalized) . PHP_EOL;
+			$result_normalized = MR\GJTools::geojsonToArray($result);
+			if ($debug) print "RS_N" . PHP_EOL . json_encode($result_normalized) . PHP_EOL;
+			$ret = MR\GJTools::compareCoordinates($result_normalized, $expected_normalized, $diff);
+		} catch (\Exception $ex) {
+			if ('Exception' === $expected)
+				$ret = true;
+			else
+				$ret = false;
+		}
 
 		if ($ret) {
 			print "Result PASS {$test_number} {$op}" . PHP_EOL;

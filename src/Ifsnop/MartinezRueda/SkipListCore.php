@@ -20,7 +20,6 @@ trait SkipListCore
         // Centinela con la altura máxima; sus next/prev sobrantes quedan null.
         $this->header = new SkipNode(null, $this->maxLevel);
         $this->level  = 1;
-        mt_srand(42);
     }
 
     /** Altura aleatoria con p = 1/2 (skip list clásico). */
@@ -28,10 +27,9 @@ trait SkipListCore
     {
         // LCG determinista: misma secuencia en cada ejecución, sin mt_rand().
         // Parámetros de Numerical Recipes: m=2^32 implícito (overflow de uint32).
-        // static $seed = 0xA5F3C21B;
-        // $seed = (int)(($seed * 1664525 + 1013904223) & 0xFFFFFFFF);
-        // $r   = $seed;
-        $r   = mt_rand();
+        static $seed = 0xA5F3C21B;
+        $seed = (int)(($seed * 1664525 + 1013904223) & 0xFFFFFFFF);
+        $r   = $seed;
         $lvl = 1;
         while ($lvl < $this->maxLevel && ($r & 1)) {
             $r >>= 1;

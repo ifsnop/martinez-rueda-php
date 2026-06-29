@@ -56,6 +56,18 @@ class Intersecter
 
     public function eventAddSegment(Segment $segment, bool $primary): Node
     {
+        // Rechazar segmentos con coordenadas no finitas (NAN o INF).
+        // Un único punto NAN/INF rompe la invariante de orden de la SkipList porque
+        // las comparaciones aritméticas con NAN siempre devuelven false, haciendo que
+        // la posición del nodo dependa del camino de búsqueda (= alturas aleatorias)
+        // y produciendo resultados distintos según mt_srand().
+        $s = $segment->start;
+        $e = $segment->end;
+        if (!is_finite($s->x) || !is_finite($s->y) || !is_finite($e->x) || !is_finite($e->y)) {
+            throw new PolyBoolException(
+                "PolyBool: Segment with NaN/Inf coordinates detected; check input data"
+            );
+        }
 
         $cmp = Point::compare($segment->start, $segment->end);
 

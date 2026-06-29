@@ -1,0 +1,20 @@
+name: Update Packagist
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '*'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify Packagist
+        run: |
+          curl -XPOST \
+            -H "Content-Type: application/json" \
+            -d '{"repository":{"url":"https://github.com/ifsnop/martinez-rueda-php"}}' \
+            "https://packagist.org/api/update-package?username=ifsnop&apiToken=${{ secrets.PACKAGIST_SECRET }}"

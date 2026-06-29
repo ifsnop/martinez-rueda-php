@@ -18,6 +18,16 @@ final class RegionIntersecter extends Intersecter
         foreach ($region as $currentPoint) {
             $point1 = $point2;
             $point2 = $currentPoint;
+
+            // Saltar puntos con coordenadas no finitas: no pueden formar segmentos válidos
+            // y romperían la invariante de orden de la SkipList.
+            if (
+                !is_finite($point1->x) || !is_finite($point1->y) ||
+                !is_finite($point2->x) || !is_finite($point2->y)
+            ) {
+                continue;
+            }
+
             $forward = Point::compare($point1, $point2);
 
             if ($forward === 0) {
