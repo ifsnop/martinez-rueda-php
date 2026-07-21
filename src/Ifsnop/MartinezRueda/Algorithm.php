@@ -649,11 +649,13 @@ final class Algorithm
 
     public static function unionMany(array $polygons): Polygon
     {
-        if (count($polygons) === 0) {
+        $n = count($polygons);
+        if ( 0 === $n ) {
             throw new \InvalidArgumentException('unionMany requires at least one polygon.');
         }
-        if (count($polygons) === 1) {
-            return $polygons[0]; // identidad
+        if ( 1 === $n ) {
+	    $key = array_key_first($polygons);
+            return $polygons[$key]; // identidad
         }
         $items = self::polygonsToSegments($polygons);
         $result = self::reduceBalanced(
@@ -666,11 +668,13 @@ final class Algorithm
 
     public static function intersectMany(array $polygons): Polygon
     {
-        if (count($polygons) === 0) {
+        $n = count($polygons);
+        if ( 0 === $n ) {
             throw new \InvalidArgumentException('intersectMany requires at least one polygon.');
         }
-        if (count($polygons) === 1) {
-            return $polygons[0];
+        if ( 1 === $n ) {
+	    $key = array_key_first($polygons);
+            return $polygons[$key]; // identidad
         }
         $items = self::polygonsToSegments($polygons);
         $result = self::reduceBalanced(
@@ -682,11 +686,13 @@ final class Algorithm
 
     public static function xorMany(array $polygons): Polygon
     {
-        if (count($polygons) === 0) {
+        $n = count($polygons);
+        if ( 0 === $n ) {
             throw new \InvalidArgumentException('xorMany requires at least one polygon.');
         }
-        if (count($polygons) === 1) {
-            return $polygons[0];
+        if ( 1 === $n ) {
+	    $key = array_key_first($polygons);
+            return $polygons[$key]; // identidad
         }
         $items = self::polygonsToSegments($polygons);
         $result = self::reduceBalanced(
@@ -704,11 +710,12 @@ final class Algorithm
         // Polygon → PolySegments preservando el orden original — por eso el código anterior
         // llama a self::segments() dentro del bucle en lugar de pre-calcular todo.
         $n = count($polygons);
-        if ($n === 0) {
+        if ( 0 === $n ) {
             throw new \InvalidArgumentException('differenceMany requires at least one polygon.');
         }
-        if ($n === 1) {
-            return $polygons[0];
+        if ( 1 === $n ) {
+	    $key = array_key_first($polygons);
+            return $polygons[$key]; // identidad
         }
         // ((subject \ mask1) \ mask2) \ ...
         $result = self::segments($polygons[0]);
