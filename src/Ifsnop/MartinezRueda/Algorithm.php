@@ -388,6 +388,18 @@ final class Algorithm
         };
     }
 
+    /**
+     * Keeps only boundary segments (different fill on each side). Needed whenever
+     * phase-1 segments are passed to polygon() without going through combineSelect().
+     */
+    private static function boundaryOnly(array $segments): array
+    {
+        return array_values(array_filter(
+            $segments,
+            static fn(Segment $s) => $s->myFill->above !== $s->myFill->below
+        ));
+    }
+
     private static function unionSegments(PolySegments $a, PolySegments $b): PolySegments
     {
         if (
@@ -396,7 +408,7 @@ final class Algorithm
             !self::boundsOverlap($a->bounds, $b->bounds)
         ) {
             return new PolySegments(
-                segments: array_merge($a->segments, $b->segments),
+                segments: array_merge(self::boundaryOnly($a->segments), self::boundaryOnly($b->segments)),
                 isInverted: false,
                 bounds: self::mergeBounds($a->bounds, $b->bounds)
             );
@@ -426,7 +438,7 @@ final class Algorithm
             !self::boundsOverlap($a->bounds, $b->bounds)
         ) {
             return new PolySegments(
-                segments: array_merge($a->segments, $b->segments),
+                segments: array_merge(self::boundaryOnly($a->segments), self::boundaryOnly($b->segments)),
                 isInverted: false,
                 bounds: self::mergeBounds($a->bounds, $b->bounds)
             );
@@ -442,7 +454,7 @@ final class Algorithm
             !$b->isInverted &&
             !self::boundsOverlap($a->bounds, $b->bounds)
         ) {
-            return $a;
+            return self::makePolySegments(self::boundaryOnly($a->segments), $a->isInverted);
         }
 
         return self::combineSelect($a, $b, 'difference');
