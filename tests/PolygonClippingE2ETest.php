@@ -397,11 +397,20 @@ final class PolygonClippingE2ETest extends TestCase
 	if ( self::isDebugEnabled() )
 	    print "got:\t" . json_encode($got) . PHP_EOL;
 
-	$got_normalized = MR\GJTools::geojsonToArray($got);
+	$knownReason = self::KNOWN_DEVIATIONS[$label] ?? null;
+
+	try {
+	    $got_normalized = MR\GJTools::geojsonToArray($got);
+	} catch (\InvalidArgumentException $e) {
+	    if ($knownReason === null) {
+		throw $e;
+	    }
+	    $this->markTestIncomplete("[$label] desviación conocida: $knownReason" . PHP_EOL .
+		"(el resultado no se puede cargar con GJTools: " . $e->getMessage() . ")" . PHP_EOL .
+		"got: " . json_encode($got));
+	}
 	if ( self::isDebugEnabled() )
 	    print "got_n:\t" . json_encode($got_normalized) . PHP_EOL;
-
-	$knownReason = self::KNOWN_DEVIATIONS[$label] ?? null;
 
 	try {
 	    $exp_normalized = MR\GJTools::geojsonToArray($expectedPath);

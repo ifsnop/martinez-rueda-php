@@ -26,6 +26,49 @@ final class GJToolsTest extends TestCase
         }
     }
 
+    /** ------------------ removeColinearPointsFromPolygon ------------------ */
+
+    public function testRemoveColinearKeepsRealCornerAndDropsMiddlePoint(): void
+    {
+        // (3,0) está entre (2,0) y (4,0): se elimina (3,0), no la esquina (2,0).
+        $ring = [[0,0],[1,3],[2,0],[3,0],[4,0],[4,4],[0,4]];
+        $this->assertSame(
+            [[0,0],[1,3],[2,0],[4,0],[4,4],[0,4],[0,0]],
+            GJTools::removeColinearPointsFromPolygon($ring)
+        );
+    }
+
+    public function testRemoveColinearDropsConsecutiveColinearPoints(): void
+    {
+        $ring = [[0,0],[1,0],[2,0],[3,0],[4,0],[4,4],[0,4],[0,0]];
+        $this->assertSame(
+            [[0,0],[4,0],[4,4],[0,4],[0,0]],
+            GJTools::removeColinearPointsFromPolygon($ring)
+        );
+    }
+
+    public function testRemoveColinearChecksFirstVertex(): void
+    {
+        // (2,0) es el primer vértice pero está entre (0,0) y (4,0).
+        $ring = [[2,0],[4,0],[4,4],[0,4],[0,0]];
+        $this->assertSame(
+            [[4,0],[4,4],[0,4],[0,0],[4,0]],
+            GJTools::removeColinearPointsFromPolygon($ring)
+        );
+    }
+
+    public function testRemoveColinearKeepsTinyLonLatTriangle(): void
+    {
+        // Triángulo real de ~1 cm en grados (fixture very-small-polygon).
+        $ring = [
+            [-122.3793225342952, 37.708405012714316],
+            [-122.3793225, 37.708405],
+            [-122.37932240498668, 37.70840501108731],
+        ];
+        $out = GJTools::removeColinearPointsFromPolygon($ring);
+        $this->assertCount(4, $out); // 3 vértices + cierre
+    }
+
     public function testSimplePolygon(): void
     {
         $gj = [

@@ -270,51 +270,70 @@ final class GJTools
         return $out;
     }
 
+    /**
+     * Elimina los vértices que están sobre la recta que une a sus vecinos.
+     * Acepta el anillo abierto o cerrado y lo devuelve cerrado. Si quedan menos
+     * de 3 vértices distintos lo devuelve abierto (< 3 puntos), y closeRing()
+     * lanza la excepción de anillo inválido (código 101), como antes.
+     *
+     * Para cada vértice B se mira A (el último vértice CONSERVADO) y C (el
+     * siguiente); B se elimina si su distancia a la recta A–C es menor que
+     * Algorithm::TOLERANCE. Al usar el último conservado se eliminan también
+     * varios colineales seguidos. El primer vértice se comprueba al final
+     * (el anillo es circular).
+     *
+     * Antes se eliminaba A en lugar de B (se perdían esquinas reales) y se
+     * comparaba un área (doble del triángulo) contra 1e-12, lo que colapsaba
+     * anillos pequeños en grados (p.ej. un triángulo de 1 cm).
+     */
     public static function removeColinearPointsFromPolygon(array $polygonCoords): array
     {
-        // Asegura que el anillo esté cerrado
-        if ($polygonCoords[0] !== end($polygonCoords)) {
-            $polygonCoords[] = $polygonCoords[0];
+        $points = array_values($polygonCoords);
+        $m = count($points);
+        // Trabaja con el anillo abierto (sin el punto de cierre)
+        if ($m > 1 && $points[0][0] == $points[$m - 1][0] && $points[0][1] == $points[$m - 1][1]) {
+            array_pop($points);
+            $m--;
+        }
+        if ($m < 3) {
+            // Degenerado: se devuelve abierto (< 3 puntos) para que closeRing() lo rechace
+            return $points;
         }
 
-        $cleaned = [];
-        $n = count($polygonCoords);
-
-        // Recorre todos los puntos, excepto el último (que es igual al primero)
-        for ($i = 0; $i < $n - 2; $i++) {
-            $a = $polygonCoords[$i];
-            $b = $polygonCoords[$i + 1];
-            $c = $polygonCoords[$i + 2];
-
-            $x1 = $a[0];
-            $y1 = $a[1];
-            $x2 = $b[0];
-            $y2 = $b[1];
-            $x3 = $c[0];
-            $y3 = $c[1];
-
-            // Calcula el área del triángulo (doble)
-            $area = abs(($x2 - $x1) * ($y3 - $y1) - ($y2 - $y1) * ($x3 - $x1));
-
-            // Probar
-            // $len2 = ($x2 - $x1) ** 2 + ($y2 - $y1) ** 2;
-            // $len  = sqrt(max($len2, 1e-30));
-            // // Comparar el seno del ángulo: area / len < TOLERANCE_SQRT  (sin θ < ε)
-            // if ($area > Algorithm::TOLERANCE_SQRT * $len) {
-            //    $cleaned[] = $a;
-            // }
-
-            // Si el área es mayor que epsilon, B no es colineal
-            if ($area > Algorithm::TOLERANCE) {
-                $cleaned[] = $a;
+        $cleaned = [$points[0]];
+        for ($i = 1; $i < $m; $i++) {
+            $a = $cleaned[count($cleaned) - 1];
+            $c = $points[($i + 1) % $m];
+            if (!self::isOnLine($points[$i], $a, $c)) {
+                $cleaned[] = $points[$i];
             }
         }
 
-        // Añade el penúltimo punto y el cierre
-        $cleaned[] = $polygonCoords[$n - 2];
-        $cleaned[] = $cleaned[0];
+        // El primer vértice también puede ser colineal con sus vecinos
+        $k = count($cleaned);
+        if ($k >= 3 && self::isOnLine($cleaned[0], $cleaned[$k - 1], $cleaned[1])) {
+            array_shift($cleaned);
+        }
+        if (count($cleaned) < 3) {
+            // Todos los vértices sobre una recta: degenerado, se devuelve abierto
+            return $cleaned;
+        }
 
+        $cleaned[] = $cleaned[0];
         return $cleaned;
+    }
+
+    /**
+     * ¿Está B a menos de Algorithm::TOLERANCE de la recta A–C?
+     * |cross| / max(|dx|,|dy|) aproxima la distancia (con un factor ≤ √2).
+     * Si A y C coinciden (B es una "espiga" que vuelve sobre sí misma) devuelve true.
+     */
+    private static function isOnLine(array $b, array $a, array $c): bool
+    {
+        $dx = $c[0] - $a[0];
+        $dy = $c[1] - $a[1];
+        $cross = abs($dx * ($b[1] - $a[1]) - $dy * ($b[0] - $a[0]));
+        return $cross <= Algorithm::TOLERANCE * max(abs($dx), abs($dy));
     }
 
     /*
