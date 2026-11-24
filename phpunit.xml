@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit
+	defaultTestSuite="Test Suite"
 	bootstrap="vendor/autoload.php"
 	colors="true"
 	displayDetailsOnPhpunitDeprecations="true"
@@ -10,6 +11,11 @@
     <testsuites>
         <testsuite name="Test Suite">
             <directory>tests</directory>
+            <exclude>tests/issues</exclude>
+        </testsuite>
+        <!-- Seguimiento de ISSUES.md (ver tests/issues/IssuesProgressTest.php) -->
+        <testsuite name="issues">
+            <directory>tests/issues</directory>
         </testsuite>
     </testsuites>
     <php>

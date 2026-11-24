@@ -11,6 +11,21 @@ at a time. Tick the box when an item is done.
 - Severity: **High** = wrong results on realistic input · **Medium** = wrong results
   on unusual input, or a gap that hides bugs · **Low** = robustness, tooling, cleanup.
 - Line numbers refer to branch `fix/edge-shortcut-phpstan-fuzz` and will drift.
+- **Progress check:** `tests/issues/IssuesProgressTest.php` has one or more tests
+  per item, named after its ID (`testF1_…`, `testIssue01_…`). A pass means fixed,
+  a fail means still open, and the failure message says what's missing. The file
+  isn't in the default suite, so it doesn't break CI. Run it with:
+
+  ```
+  vendor/bin/phpunit --testsuite issues --testdox
+  ```
+
+  The decision items (3, 7) can't know which way you'll decide; those tests check
+  that whichever decision you make is applied consistently and documented. If you
+  fix an item differently from the proposal, check its test still measures the
+  right thing. A green check doesn't replace running `vendor/bin/phpunit` and
+  `php tests.php`. For example, the snap experiment in item 2 turns its checks
+  green but breaks `tests.php` #8.
 - `tests/RandomizedClippingTest.php` is the main tool for checking any geometric
   change. Run a deeper pass with
   `FUZZ_ITERS=200 FUZZ_SEEDS=5 vendor/bin/phpunit tests/RandomizedClippingTest.php`.
@@ -25,7 +40,7 @@ at a time. Tick the box when an item is done.
 | [F4](#f4-gjtools-collinear-removal-deleted-the-wrong-vertex) | GJTools collinear removal deleted the wrong vertex | High | Fixed (this branch) |
 | [1](#1-scale-dependent-tolerances-small-lonlat-features-give-wrong-results) | Scale-dependent tolerances: small lon/lat features give wrong results | High | Open, fix proposed and tested |
 | [2](#2-endpoint-snapping-tolerance-is-relative-to-segment-length) | Endpoint snapping tolerance is relative to segment length | High | Open, needs study |
-| [3](#3-fill-rule-for-overlapping-parts-and-duplicated-rings-is-undecided) | Fill rule for overlapping parts / duplicated rings undecided | Medium | Open, decision needed |
+| [3](#3-fill-rule-for-overlapping-parts-and-duplicated-rings-is-undecided) | Fill rule for overlapping parts / duplicated rings undecided | Medium | Open, decision needed (behaviour is consistent) |
 | [4](#4-e2e-comparison-uses-the-library-itself-false-passes) | E2E comparison uses the library itself (false passes) | Medium | Open |
 | [5](#5-polygoncreate-leaves-isinverted-uninitialized) | `Polygon::create()` leaves `isInverted` uninitialized | Low | Open |
 | [6](#6-many-with-a-single-polygon-return-the-raw-input) | `*Many()` with a single polygon return the raw input | Low | Open |
@@ -283,33 +298,39 @@ snapping, or whether #8 exposes a case the new rule must handle.
 parts), but such input is common in practice.
 
 **Problem.** When a polygon's own rings overlap, the library applies the
-**even-odd** rule: the overlap cancels out. polygon-clipping, the source of the
-E2E fixtures, **unions** the parts of a MultiPolygon. As a result:
+**even-odd** rule: the overlap cancels out, and a ring listed twice cancels itself.
+It does this **consistently**: union with an empty polygon, difference, intersect
+and xor all agree, which `IssuesProgressTest::testIssue03_*Consistently` checks.
+polygon-clipping, the source of the E2E fixtures, **unions** the parts of a
+MultiPolygon instead. As a result, 8 single-geometry fixtures differ:
+`issue-61`, `issue-61-2`, `issue-62`, `issue-62-2`, `issue-68`,
+`parallel-lines-with-crossing`, `split-almost-vertical-segment` and
+`union-same-shape-multiple-times`. For all 8, our output matches the even-odd
+reading of the input at 100% of sample points. They are listed in
+`KNOWN_DEVIATIONS`. The rule isn't documented anywhere.
 
-- 8 single-geometry fixtures differ: `issue-61`, `issue-61-2`, `issue-62`,
-  `issue-62-2`, `issue-68`, `parallel-lines-with-crossing`,
-  `split-almost-vertical-segment` and `union-same-shape-multiple-times`. For all
-  8, our output matches the even-odd reading of the input at 100% of sample
-  points. They are listed in `KNOWN_DEVIATIONS`.
-- A ring listed twice cancels itself: phase 1 gives all its edges fill
-  `false/false`. Fixture `subtract-same-shape-multiple-times::difference` still
-  passes only because `combine()` happens to treat those `false/false` edges as
-  boundaries. That is an accident, not a rule.
+(Correction to an earlier version of this file:
+`subtract-same-shape-multiple-times::difference` passes **by rule**. Its expected
+output is the subject polygon unchanged, which is what even-odd gives when the
+subtracted MultiPolygon is the same triangle twice. It isn't an accident of
+`combine()`.)
 
 **Proposed fix.** Decide the rule and document it in the README.
 
-- **If even-odd:** replace the expected outputs of those 8 fixtures with even-odd
-  results checked by hand (or keep them as known deviations). Also make
-  `subtract-same-shape-multiple-times` pass by rule, not by accident.
+- **If even-odd** (current behaviour, no code change): document it. Then either
+  keep the 8 fixtures as known deviations, or replace their expected outputs with
+  even-odd results checked by hand.
 - **If union of parts (nonzero-like):** phase 1 (`RegionIntersecter`) would have
   to treat each part separately. The simplest way is to `unionMany` the parts
   before the operation. Changing the fill toggle in phase 1 to a winding count is
-  the alternative. Either way the even-odd behaviour inside a single
-  self-intersecting ring must be decided too.
+  the alternative. Either way, decide what happens inside a single
+  self-intersecting ring too, and update the oracle in
+  `tests/Support/GeometryOracle.php` (`inside()` encodes even-odd), which the
+  `selfx` and `grid` generators rely on.
 
-**Verify.** The 8 fixtures leave `KNOWN_DEVIATIONS`. The `selfx` and `grid`
-generators in `RandomizedClippingTest` encode even-odd in their oracle (`inside()`),
-so update the oracle if the rule changes.
+**Verify.** `testIssue03_fillRuleIsDocumented` passes once the README names the
+rule. The two consistency tests must keep passing. If you choose union of parts,
+the 8 fixtures should leave `KNOWN_DEVIATIONS`.
 
 ### 4. E2E comparison uses the library itself (false passes)
 
@@ -327,7 +348,7 @@ returns `[]` for it. `xor([], 1-cm triangle)` is also `[]`, because of issue 1, 
 the harness concludes they're equal.
 
 **Proposed fix.** Compare with an independent method. Use the point-sampling
-oracle from `RandomizedClippingTest` (`inside()` on random points inside both
+oracle in `tests/Support/GeometryOracle.php` (`inside()` on random points inside both
 results' bounding box, skipping points near edges), or compare areas plus a
 sampled symmetric difference. Keep the exact coordinate comparison as the first,
 fast check.
