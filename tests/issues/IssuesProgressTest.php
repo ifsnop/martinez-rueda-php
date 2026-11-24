@@ -388,6 +388,20 @@ final class IssuesProgressTest extends TestCase
         $this->ok($missing === [], 'README.md enlaza ficheros que no existen: ' . implode(', ', $missing));
     }
 
+    /** 10: la tabla "Mejoras sugeridas" del README no lista como pendientes cosas ya hechas. */
+    public function testIssue10_readmeImprovementsTableIsUpToDate(): void
+    {
+        $stale = [
+            'sin tipo de retorno'                   => '5 (combine() ya tiene tipo de retorno)',
+            '`intersectionMany`, `differenceMany`, `xorMany` ausentes' => '7 (los *Many existen)',
+            'Cache de `pointKey`'                   => '1 (pointKey ya se cachea)',
+            'no usa tolerancia correcta'            => '3 (arreglado en F4)',
+        ];
+        $readme = (string)file_get_contents(self::ROOT . '/README.md');
+        $found = array_values(array_filter($stale, fn($v, $k) => str_contains($readme, $k), ARRAY_FILTER_USE_BOTH));
+        $this->ok($found === [], 'la tabla "Mejoras sugeridas" del README sigue listando puntos ya hechos: ' . implode('; ', $found));
+    }
+
     public function testIssue10_ciRunsPhpstan(): void
     {
         $this->ok(self::fileContains('.github/workflows/php.yml', '/phpstan/i'), 'la CI (.github/workflows/php.yml) no ejecuta PHPStan');

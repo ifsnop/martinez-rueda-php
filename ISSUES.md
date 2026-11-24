@@ -47,7 +47,7 @@ at a time. Tick the box when an item is done.
 | [7](#7-gjtools-rejects-the-whole-input-when-one-ring-is-degenerate) | GJTools rejects the whole input when one ring is degenerate | Low | Open, decision needed |
 | [8](#8-pointkey-overflows-and-projected-coordinates-are-not-supported) | `pointKey()` overflow / projected coordinates | Low (lon/lat) | Open |
 | [9](#9-remaining-phpstan-findings) | Remaining PHPStan findings | Low | Open |
-| [10](#10-repository-and-ci-hygiene) | Repository and CI hygiene | Low | Open |
+| [10](#10-repository-and-ci-hygiene) | Repository and CI hygiene | Low | Mostly fixed; README table pending |
 | [L](#known-limitations-accepted) | Known limitations (accepted) | — | Documented |
 
 ---
@@ -454,12 +454,14 @@ Also consider running PHPStan in CI (see [10](#10-repository-and-ci-hygiene)).
 
 ### 10. Repository and CI hygiene
 
-- [ ] Open.
+- [ ] Open. Only the README table is left.
 
-- **No `.gitignore` for `vendor/` and `.phpunit.result.cache`.** Add them, and
-  commit `.gitignore` (a local copy exists but isn't tracked).
-- **README links to `IMPROVEMENTS.md`, which doesn't exist**, and its "Mejoras
-  sugeridas" table is outdated. Current status of its 8 items:
+- [x] **`.gitignore`** with `vendor/` and `.phpunit.result.cache`, committed
+  (`822013f`).
+- [x] **Broken README link** to `IMPROVEMENTS.md`: now points to this file
+  (`80a1595`).
+- [ ] **The README's "Mejoras sugeridas" table is outdated.** Current status of
+  its 8 items:
 
   | # | Item | Status |
   |---|---|---|
@@ -472,12 +474,18 @@ Also consider running PHPStan in CI (see [10](#10-repository-and-ci-hygiene)).
   | 7 | `intersectionMany`, `differenceMany`, `xorMany` | Done |
   | 8 | `buildGeometryFromCoordinates` | Accepts arrays now; docblock still wrong (see [9](#9-remaining-phpstan-findings)) |
 
-  Point the README to this file instead, and drop or refresh the table.
-- **CI (`.github/workflows/php.yml`)** runs PHPUnit and `tests.php` but not
-  PHPStan. Its Composer cache key hashes `composer.lock`, which isn't committed,
-  so the cache never matches. Commit a lock file, or key on `composer.json`.
-- **Local development:** PHPUnit 10 needs the `dom`, `mbstring` and `xmlwriter`
-  PHP extensions. Mention them in the README's Testing section.
+  Drop the done items from the README table (or drop the table and rely on this
+  file).
+- [x] **PHPStan in CI**: added as a **non-blocking** step (`continue-on-error: true`)
+  that reports its findings as GitHub annotations. When
+  [9](#9-remaining-phpstan-findings) is fixed, remove `continue-on-error` so new
+  findings fail the build.
+- [x] **CI Composer cache key**: `composer.lock` is now committed, so
+  `hashFiles('**/composer.lock')` matches. CI also gets reproducible dependency
+  versions (PHPUnit 10.5.67, PHPStan 2.3.7, dead-code-detector 0.14.1). Refresh
+  the lock with `composer update`.
+- [x] **Required PHP extensions** (`dom`, `mbstring`, `xmlwriter`) are documented
+  in the README's Testing section.
 
 ---
 
