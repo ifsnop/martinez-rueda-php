@@ -307,7 +307,7 @@ Cada `Node` de evento guarda una referencia directa al `SkipNode` que lo contien
 
 ## Mejoras sugeridas
 
-> Las mejoras detalladas, con propuestas de implementación, se encuentran en el documento [`IMPROVEMENTS.md`](./IMPROVEMENTS.md).
+> Las mejoras detalladas, con propuestas de implementación, se encuentran en el documento [`ISSUES.md`](./ISSUES.md).
 
 ### Resumen
 
