@@ -10,6 +10,34 @@ include_once('autoloader.php');
 
 final class PolygonClippingE2ETest extends TestCase
 {
+    /**
+     * Casos de polygon-clipping (una sola geometría) cuyo resultado esperado no
+     * coincide con el de esta librería por motivos conocidos. Se ejecutan igual
+     * (una excepción de la librería sigue siendo un error), pero si el resultado
+     * difiere se marcan como "incomplete" en lugar de fallar. Si algún día
+     * coinciden, el test pasa normalmente y conviene quitar la entrada.
+     */
+    private const EVEN_ODD = 'la entrada es un MultiPolygon cuyas partes se solapan; esta librería '
+        . 'aplica la regla par-impar (el solape se cancela) y polygon-clipping las une. '
+        . 'El resultado coincide con la interpretación par-impar de la entrada.';
+    private const SUB_TOLERANCE = 'polígono diminuto: sus productos vectoriales (≈ área) quedan por debajo de '
+        . 'Algorithm::TOLERANCE (1e-12, absoluta), la librería lo descarta como degenerado y polygon-clipping '
+        . 'lo conserva. Relacionado con la dependencia de la escala de coordenadas.';
+    private const KNOWN_DEVIATIONS = [
+        'issue-61::union'                         => self::EVEN_ODD,
+        'issue-61-2::union'                       => self::EVEN_ODD,
+        'issue-62::union'                         => self::EVEN_ODD,
+        'issue-62-2::union'                       => self::EVEN_ODD,
+        'issue-68::union'                         => self::EVEN_ODD,
+        'parallel-lines-with-crossing::union'     => self::EVEN_ODD,
+        'split-almost-vertical-segment::union'    => self::EVEN_ODD,
+        'union-same-shape-multiple-times::union'  => self::EVEN_ODD,
+        'nearly-vertical-segment::union'          => self::SUB_TOLERANCE,
+        'thin-vertical-triangle::union'           => self::SUB_TOLERANCE,
+        'thin-vertical-triangle-2::union'         => self::SUB_TOLERANCE,
+        'very-small-polygon::union'               => self::SUB_TOLERANCE,
+    ];
+
     // ==========================
     // Parámetros vía entorno
     // ==========================
@@ -352,9 +380,17 @@ final class PolygonClippingE2ETest extends TestCase
 		$input . PHP_EOL;
 	}
 
-        if (count($geoms) < 2) {
+        if (count($geoms) === 0) {
             $this->markTestSkipped("[$label] args sin geometrías: $argsPath");
         }
+
+	// Una sola geometría: se opera contra un polígono vacío, lo que equivale a
+	// "limpiar" la geometría (resolver auto-intersecciones, anillos solapados,
+	// segmentos degenerados...). Así se ejecutan los casos de polygon-clipping
+	// que sólo tienen un argumento (union de una geometría consigo misma).
+	if (count($geoms) === 1) {
+	    $geoms[] = [];
+	}
 
 	$got = self::runOpMulti($geoms, $op);
 
@@ -365,15 +401,33 @@ final class PolygonClippingE2ETest extends TestCase
 	if ( self::isDebugEnabled() )
 	    print "got_n:\t" . json_encode($got_normalized) . PHP_EOL;
 
-	$exp_normalized = MR\GJTools::geojsonToArray($expectedPath);
+	$knownReason = self::KNOWN_DEVIATIONS[$label] ?? null;
+
+	try {
+	    $exp_normalized = MR\GJTools::geojsonToArray($expectedPath);
+	} catch (\InvalidArgumentException $e) {
+	    if ($knownReason === null) {
+		throw $e;
+	    }
+	    $this->markTestIncomplete("[$label] desviación conocida: $knownReason" . PHP_EOL .
+		"(el fichero esperado no se puede cargar con GJTools: " . $e->getMessage() . ")" . PHP_EOL .
+		"got: " . json_encode($got_normalized));
+	}
 	if ( self::isDebugEnabled() )
 	    print "exp:\t" . json_encode($exp_normalized) . PHP_EOL . PHP_EOL;
 
 	$diff = [];
+	$equal = self::compareCoordinates($got_normalized, $exp_normalized, $diff) ||
+	    self::comparePolygons($got_normalized, $exp_normalized, $diff);
+
+	if (!$equal && $knownReason !== null) {
+	    $this->markTestIncomplete("[$label] desviación conocida: $knownReason" . PHP_EOL .
+		"got: " . json_encode($got_normalized) . PHP_EOL .
+		"expected: " . json_encode($exp_normalized));
+	}
 
         $this->assertTrue(
-	    self::compareCoordinates($got_normalized, $exp_normalized, $diff) ||
-	    self::comparePolygons($got_normalized, $exp_normalized, $diff),
+	    $equal,
             "Diferencia detectada" . PHP_EOL .
 	    "input" . PHP_EOL . $input .PHP_EOL .
 	    "operation" . PHP_EOL . "\t" . $op . PHP_EOL .
