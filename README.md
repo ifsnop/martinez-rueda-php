@@ -338,8 +338,22 @@ php \
 Some tests inside tests.php, extended coverage with PHPUnit:
 
 - php tests.php
-- ./vendor/bin/phpunit tests/
-- ./vendor/phpstan/phpstan/phpstan --error-format=raw
+- ./vendor/bin/phpunit
+- ./vendor/bin/phpstan analyse --error-format=raw
+
+Requirements: PHP >= 8.1 and, for PHPUnit, the PHP extensions `dom`, `mbstring`
+and `xmlwriter` (plus `json`, `libxml` and `tokenizer`, usually built in). The
+library itself doesn't need them. On Debian/Ubuntu:
+
+    sudo apt install php-xml php-mbstring
+
+Without them `composer install` refuses to install PHPUnit, and PHPUnit stops with
+"PHPUnit requires the "dom", ... extensions".
+
+Known issues and their status are tracked in [`ISSUES.md`](./ISSUES.md). To see
+which ones are already fixed:
+
+- ./vendor/bin/phpunit --testsuite issues --testdox --colors=never
 
 ## Tutorials and notes
 
