@@ -19,7 +19,10 @@ require_once __DIR__ . '/../PolygonClippingE2ETest.php';
  * No forma parte de la suite por defecto (phpunit.xml: defaultTestSuite), así que
  * no rompe la CI mientras queden puntos abiertos. Para ver el progreso:
  *
- *     vendor/bin/phpunit --testsuite issues --testdox
+ *     vendor/bin/phpunit --testsuite issues --testdox --colors=never
+ *
+ * (Con colores, PHPUnit pinta los mensajes de fallo en blanco sobre rojo, que en
+ * algunos terminales no se lee bien; por eso se recomienda --colors=never.)
  *
  * Los nombres empiezan por el identificador de ISSUES.md (F1..F4 = ya arreglados,
  * sirven de regresión; Issue01..Issue10 = abiertos). Cuando un punto se arregla
@@ -55,9 +58,27 @@ final class IssuesProgressTest extends TestCase
         return $s;
     }
 
+    /**
+     * assertTrue con un mensaje propio y corto. Los asserts de PHPUnit que
+     * comparan cadenas o arrays vuelcan el contenido completo (README, ficheros,
+     * coordenadas), y con colores eso es un bloque rojo ilegible.
+     */
+    private function ok(bool $condition, string $message): void
+    {
+        $this->assertTrue($condition, $message);
+    }
+
+    /** Resume la lista de discrepancias del oráculo en una línea. */
     private function assertNoProblems(array $problems, string $what): void
     {
-        $this->assertSame([], array_slice($problems, 0, 2), count($problems) . " operaciones incorrectas: $what");
+        $first = $problems ? strtok($problems[0], PHP_EOL) : '';
+        $this->ok($problems === [], count($problems) . " operaciones incorrectas en: $what (primera: $first)");
+    }
+
+    private static function fileContains(string $relPath, string $regex): bool
+    {
+        $file = self::ROOT . '/' . $relPath;
+        return is_file($file) && preg_match($regex, (string)file_get_contents($file)) === 1;
     }
 
     // ── Ya arreglados (regresión) ────────────────────────────────────────────
@@ -75,11 +96,10 @@ final class IssuesProgressTest extends TestCase
     public function testF2_phpstanConfigPointsToExistingPaths(): void
     {
         $neon = file_get_contents(self::ROOT . '/phpstan.neon');
-        $this->assertMatchesRegularExpression('/paths:\s*\n((\s*-\s*\S+\s*\n)+)/', $neon);
-        preg_match('/paths:\s*\n((?:\s*-\s*\S+\s*\n)+)/', $neon, $m);
+        $this->ok(preg_match('/paths:\s*\n((?:\s*-\s*\S+\s*\n)+)/', $neon, $m) === 1, 'phpstan.neon no tiene una lista "paths:"');
         preg_match_all('/-\s*(\S+)/', $m[1], $paths);
         foreach ($paths[1] as $p) {
-            $this->assertFileExists(self::ROOT . '/' . trim($p, "'\""), "phpstan.neon apunta a una ruta inexistente: $p");
+            $this->ok(file_exists(self::ROOT . '/' . trim($p, "'\"")), "phpstan.neon apunta a una ruta inexistente: $p");
         }
     }
 
@@ -100,9 +120,10 @@ final class IssuesProgressTest extends TestCase
     /** F4: GJTools elimina el punto colineal intermedio, no la esquina anterior. */
     public function testF4_gjtoolsRemovesTheCollinearVertexNotTheCorner(): void
     {
-        $this->assertSame(
-            [[0, 0], [1, 3], [2, 0], [4, 0], [4, 4], [0, 4], [0, 0]],
-            GJTools::removeColinearPointsFromPolygon([[0, 0], [1, 3], [2, 0], [3, 0], [4, 0], [4, 4], [0, 4]])
+        $got = GJTools::removeColinearPointsFromPolygon([[0, 0], [1, 3], [2, 0], [3, 0], [4, 0], [4, 4], [0, 4]]);
+        $this->ok(
+            $got === [[0, 0], [1, 3], [2, 0], [4, 0], [4, 4], [0, 4], [0, 0]],
+            'removeColinearPointsFromPolygon devuelve ' . json_encode($got) . ' (debería quitar (3,0) y conservar (2,0))'
         );
     }
 
@@ -113,7 +134,7 @@ final class IssuesProgressTest extends TestCase
     {
         $A = [[[-3.699848772543026, 40.40004447766722], [-3.699861673144788, 40.40005385016095], [-3.6998228041022325, 40.40011705732156]]];
         $B = [[[-3.699906427846182, 40.40018978313583], [-3.69998721385193, 40.400144433425936], [-3.6998277419565775, 40.39995413437151]]];
-        $this->assertNotSame([], Algorithm::union(self::poly($A), self::poly($B))->getArray(), 'la unión sale vacía');
+        $this->ok(Algorithm::union(self::poly($A), self::poly($B))->getArray() !== [], 'la unión de los dos triángulos sale vacía');
         $this->assertNoProblems(GeometryOracle::check($A, $B), 'triángulos de ~15 m');
     }
 
@@ -122,8 +143,9 @@ final class IssuesProgressTest extends TestCase
     {
         $tri = [[[-122.3793225342952, 37.708405012714316], [-122.3793225, 37.708405], [-122.37932240498668, 37.70840501108731]]];
         $out = Algorithm::union(self::poly($tri), self::empty())->getArray();
-        $this->assertNotSame([], $out, 'el triángulo de 1 cm desaparece');
-        $this->assertEqualsWithDelta(self::area($tri), self::area($out), 1e-17);
+        $this->ok($out !== [], 'el triángulo de 1 cm desaparece (union con vacío devuelve [])');
+        $this->ok(abs(self::area($tri) - self::area($out)) <= 1e-17,
+            sprintf('el área cambia: %.3e en vez de %.3e', self::area($out), self::area($tri)));
     }
 
     /** 1: polígonos aleatorios de ~1 m (1e-5°) cerca de Madrid. */
@@ -192,9 +214,8 @@ final class IssuesProgressTest extends TestCase
      */
     public function testIssue03_fillRuleIsDocumented(): void
     {
-        $this->assertMatchesRegularExpression(
-            '/par-impar|even-odd|even\/odd|nonzero|non-zero|uni[oó]n de (las )?partes/i',
-            file_get_contents(self::ROOT . '/README.md'),
+        $this->ok(
+            self::fileContains('README.md', '/par-impar|even-odd|even\/odd|nonzero|non-zero|uni[oó]n de (las )?partes/i'),
             'README no documenta la regla de relleno para partes solapadas o anillos repetidos'
         );
     }
@@ -204,7 +225,7 @@ final class IssuesProgressTest extends TestCase
     {
         $tri = [[0, 0], [4, 0], [2, 3]];
         $m = self::membershipByPath([$tri, $tri], 2.0, 1.0);
-        $this->assertCount(1, array_unique($m), 'Interpretación incoherente del anillo duplicado: ' . json_encode($m)
+        $this->ok(count(array_unique($m)) === 1, 'Interpretación incoherente del anillo duplicado: ' . json_encode($m)
             . '. Decidir la regla (par-impar: se cancela; unión de partes: cuenta una vez) y aplicarla en todos los caminos.');
     }
 
@@ -213,7 +234,7 @@ final class IssuesProgressTest extends TestCase
     {
         $P = [[[0, 0], [3, 0], [3, 3], [0, 3]], [[1, 1], [4, 1], [4, 4], [1, 4]]];
         $m = self::membershipByPath($P, 2.0, 2.0);
-        $this->assertCount(1, array_unique($m), 'Interpretación incoherente del solape: ' . json_encode($m));
+        $this->ok(count(array_unique($m)) === 1, 'Interpretación incoherente del solape: ' . json_encode($m));
     }
 
     // ── 4. La comparación E2E usa la propia librería ─────────────────────────
@@ -229,9 +250,8 @@ final class IssuesProgressTest extends TestCase
         $lines = file($m->getFileName());
         $body = implode('', array_slice($lines, $m->getStartLine() - 1, $m->getEndLine() - $m->getStartLine() + 1));
         $body = preg_replace('#//[^\n]*|/\*.*?\*/#s', '', $body); // sin comentarios
-        $this->assertDoesNotMatchRegularExpression(
-            '/runOp|Algorithm::|MR\\\\Algorithm/',
-            $body,
+        $this->ok(
+            preg_match('/runOp|Algorithm::|MR\\\\Algorithm/', $body) !== 1,
             'comparePolygons() usa la propia librería (runOp/Algorithm) para decidir si dos resultados son iguales'
         );
     }
@@ -241,8 +261,8 @@ final class IssuesProgressTest extends TestCase
     {
         $tri = [[-122.3793225342952, 37.708405012714316], [-122.3793225, 37.708405],
                 [-122.37932240498668, 37.70840501108731], [-122.3793225342952, 37.708405012714316]];
-        $this->assertFalse(
-            PolygonClippingE2ETest::comparePolygons([], [[$tri]]),
+        $this->ok(
+            !PolygonClippingE2ETest::comparePolygons([], [[$tri]]),
             'comparePolygons() da por iguales [] y un triángulo de 1 cm (usa xor de la librería para comparar)'
         );
     }
@@ -258,7 +278,7 @@ final class IssuesProgressTest extends TestCase
         } catch (\Error $e) {
             $this->fail('Polygon::create() como operando lanza: ' . $e->getMessage());
         }
-        $this->assertTrue(GeometryOracle::inside($r->getArray(), 0.5, 0.5));
+        $this->ok(GeometryOracle::inside($r->getArray(), 0.5, 0.5), 'union(vacío, cuadrado) no contiene el cuadrado');
     }
 
     // ── 6. *Many() con un solo polígono ──────────────────────────────────────
@@ -269,7 +289,7 @@ final class IssuesProgressTest extends TestCase
         $P = [[[0, 0], [3, 0], [3, 3], [0, 3]], [[1, 1], [4, 1], [4, 4], [1, 4]]];
         $expected = Algorithm::union(self::poly($P), self::empty())->getArray();
         foreach (['unionMany', 'intersectMany', 'xorMany', 'differenceMany'] as $fn) {
-            $this->assertSame($expected, Algorithm::$fn([self::poly($P)])->getArray(), "$fn([P]) devuelve P sin limpiar");
+            $this->ok($expected === Algorithm::$fn([self::poly($P)])->getArray(), "$fn([P]) devuelve P sin limpiar (distinto de union(P, vacío))");
         }
     }
 
@@ -288,11 +308,10 @@ final class IssuesProgressTest extends TestCase
         ]];
         try {
             $out = GJTools::geojsonToArray($gj);
-            $this->assertCount(1, $out, 'se esperaba el polígono exterior sin el hueco degenerado');
+            $this->ok(count($out) === 1, 'se esperaba el polígono exterior sin el hueco degenerado');
         } catch (\InvalidArgumentException $e) {
-            $this->assertStringNotContainsString(
-                'debe ignorarse',
-                file_get_contents(self::ROOT . '/tests/GJToolsTest.php'),
+            $this->ok(
+                !self::fileContains('tests/GJToolsTest.php', '/debe ignorarse/'),
                 'GJTools lanza excepción por un hueco degenerado, pero GJToolsTest dice que debe ignorarse. Decidir el contrato.'
             );
         }
@@ -307,7 +326,8 @@ final class IssuesProgressTest extends TestCase
         $key->setAccessible(true);
         $a = new Point(1e6, 0.0);
         $b = new Point(1e6 + 18446744.073709552, 0.0);
-        $this->assertNotSame($key->invoke(null, $a), $key->invoke(null, $b), 'pointKey() desborda y da la misma clave');
+        $this->ok($key->invoke(null, $a) !== $key->invoke(null, $b),
+            'pointKey() desborda: (1e6, 0) y (1e6 + 18446744.07, 0) tienen la misma clave ' . $key->invoke(null, $a));
     }
 
     /** 8: coordenadas proyectadas tipo UTM (metros, ~4.5e6) con aristas casi coincidentes. */
@@ -338,7 +358,7 @@ final class IssuesProgressTest extends TestCase
         $json = shell_exec($cmd);
         chdir($cwd);
         $res = json_decode((string)$json, true);
-        $this->assertIsArray($res, 'no se pudo ejecutar PHPStan: ' . substr((string)$json, 0, 300));
+        $this->ok(is_array($res), 'no se pudo ejecutar PHPStan: ' . substr((string)$json, 0, 200));
         $errors = [];
         foreach ($res['files'] ?? [] as $file => $f) {
             foreach ($f['messages'] as $msg) {
@@ -346,18 +366,18 @@ final class IssuesProgressTest extends TestCase
             }
         }
         $errors = array_merge($errors, $res['errors'] ?? []);
-        $this->assertSame([], array_slice($errors, 0, 5), count($errors) . ' errores de PHPStan');
+        $sample = array_map(fn($e) => mb_strimwidth($e, 0, 110, '…'), array_slice($errors, 0, 3));
+        $this->ok($errors === [], count($errors) . ' errores de PHPStan, p.ej.:' . PHP_EOL . implode(PHP_EOL, $sample));
     }
 
     // ── 10. Repositorio y CI ─────────────────────────────────────────────────
 
     public function testIssue10_gitignoreCoversVendorAndPhpunitCache(): void
     {
-        $file = self::ROOT . '/.gitignore';
-        $this->assertFileExists($file, 'no hay .gitignore');
-        $content = file_get_contents($file);
-        $this->assertMatchesRegularExpression('#^/?vendor/?$#m', $content, '.gitignore no excluye vendor/');
-        $this->assertStringContainsString('.phpunit.result.cache', $content, '.gitignore no excluye .phpunit.result.cache');
+        $tracked = trim((string)shell_exec('git -C ' . escapeshellarg(self::ROOT) . ' ls-files .gitignore'));
+        $this->ok($tracked !== '', '.gitignore no está en el repositorio (git add .gitignore)');
+        $this->ok(self::fileContains('.gitignore', '#^/?vendor/?$#m'), '.gitignore no existe o no excluye vendor/');
+        $this->ok(self::fileContains('.gitignore', '/\.phpunit\.result\.cache/'), '.gitignore no excluye .phpunit.result.cache');
     }
 
     public function testIssue10_readmeHasNoBrokenLocalLinks(): void
@@ -365,16 +385,12 @@ final class IssuesProgressTest extends TestCase
         $readme = file_get_contents(self::ROOT . '/README.md');
         preg_match_all('#\]\(\./([^)\#]+)\)#', $readme, $m);
         $missing = array_values(array_filter($m[1], fn($p) => !file_exists(self::ROOT . '/' . $p)));
-        $this->assertSame([], $missing, 'README.md enlaza ficheros que no existen');
+        $this->ok($missing === [], 'README.md enlaza ficheros que no existen: ' . implode(', ', $missing));
     }
 
     public function testIssue10_ciRunsPhpstan(): void
     {
-        $this->assertStringContainsString(
-            'phpstan',
-            file_get_contents(self::ROOT . '/.github/workflows/php.yml'),
-            'la CI no ejecuta PHPStan'
-        );
+        $this->ok(self::fileContains('.github/workflows/php.yml', '/phpstan/i'), 'la CI (.github/workflows/php.yml) no ejecuta PHPStan');
     }
 
     public function testIssue10_ciCacheKeyMatchesCommittedFiles(): void
@@ -382,16 +398,17 @@ final class IssuesProgressTest extends TestCase
         $wf = file_get_contents(self::ROOT . '/.github/workflows/php.yml');
         if (str_contains($wf, "hashFiles('**/composer.lock')")) {
             $tracked = trim((string)shell_exec('git -C ' . escapeshellarg(self::ROOT) . ' ls-files composer.lock'));
-            $this->assertNotSame('', $tracked, 'la caché de la CI usa composer.lock, que no está en el repositorio');
+            $this->ok($tracked !== '', 'la caché de la CI usa hashFiles(composer.lock), pero composer.lock no está en el repositorio');
         }
         $this->addToAssertionCount(1);
     }
 
     public function testIssue10_readmeListsRequiredPhpExtensions(): void
     {
-        $readme = file_get_contents(self::ROOT . '/README.md');
-        foreach (['dom', 'mbstring', 'xmlwriter'] as $ext) {
-            $this->assertMatchesRegularExpression("/\\b$ext\\b/", $readme, "README no menciona la extensión $ext (necesaria para PHPUnit)");
-        }
+        $missing = array_values(array_filter(
+            ['dom', 'mbstring', 'xmlwriter'],
+            fn($ext) => !self::fileContains('README.md', "/\\b$ext\\b/")
+        ));
+        $this->ok($missing === [], 'README no menciona las extensiones necesarias para PHPUnit: ' . implode(', ', $missing));
     }
 }

@@ -17,7 +17,7 @@ at a time. Tick the box when an item is done.
   isn't in the default suite, so it doesn't break CI. Run it with:
 
   ```
-  vendor/bin/phpunit --testsuite issues --testdox
+  vendor/bin/phpunit --testsuite issues --testdox --colors=never
   ```
 
   The decision items (3, 7) can't know which way you'll decide; those tests check
@@ -456,7 +456,8 @@ Also consider running PHPStan in CI (see [10](#10-repository-and-ci-hygiene)).
 
 - [ ] Open.
 
-- **No `.gitignore` for `vendor/` and `.phpunit.result.cache`.** Add them.
+- **No `.gitignore` for `vendor/` and `.phpunit.result.cache`.** Add them, and
+  commit `.gitignore` (a local copy exists but isn't tracked).
 - **README links to `IMPROVEMENTS.md`, which doesn't exist**, and its "Mejoras
   sugeridas" table is outdated. Current status of its 8 items:
 
