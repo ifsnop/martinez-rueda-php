@@ -56,13 +56,14 @@ Clase estática central. Contiene toda la lógica de alto nivel y las operacione
 
 | Constante / Método | Descripción |
 |---|---|
-| `TOLERANCE = 1e-12` | Épsilon para comparaciones geométricas. Equivale aprox. a 1 mm en coordenadas terrestres. |
-| `TOLERANCE_SQRT = 1e-6` | Raíz de TOLERANCE, para comparaciones de valores ya elevados al cuadrado. |
+| `TOLERANCE = 1e-12` | Tolerancia de longitud para comparaciones geométricas (en grados, 1e-12 ≈ 0,1 µm). |
+| `TOLERANCE_SQRT = 1e-6` | Tolerancia adimensional (fracción de la longitud del segmento) con la que el barrido ajusta un cruce a un extremo. Ver ISSUES.md #2. |
 | `segments(Polygon)` | Fase 1: convierte un polígono a `PolySegments`. |
 | `combine(PolySegments, PolySegments)` | Fase 2: combina dos conjuntos de segmentos. |
 | `polygon(PolySegments)` | Fase 3: reconstruye un `Polygon` desde segmentos. |
 | `union / intersect / difference / xor` | Operaciones de alto nivel sobre dos `Polygon`. |
 | `unionMany(array)` | Unión de N polígonos mediante reducción balanceada. |
+| `$precision` (todas las operaciones) | Normalización de entradas redondeadas; ver [Precisión de los datos](#precisión-de-los-datos-precision). |
 | `segmentChainer(array)` | Ensambla segmentos sueltos en anillos cerrados. |
 | `splitSelfTouchingRegions(array)` | Divide anillos que se auto-tocan en ciclos simples. |
 
@@ -151,20 +152,45 @@ Usa un índice hash `head → id` y `tail → id` para encadenar segmentos en O(
 
 ```php
 // Todos aceptan dos Polygon y devuelven un Polygon
-Algorithm::union(Polygon $a, Polygon $b): Polygon
-Algorithm::intersect(Polygon $a, Polygon $b): Polygon
-Algorithm::intersection(Polygon $a, Polygon $b): Polygon  // alias de intersect
-Algorithm::difference(Polygon $a, Polygon $b): Polygon    // A \ B
-Algorithm::differenceRev(Polygon $a, Polygon $b): Polygon // B \ A
-Algorithm::xoring(Polygon $a, Polygon $b): Polygon
+Algorithm::union(Polygon $a, Polygon $b, ?float $precision = null): Polygon
+Algorithm::intersect(Polygon $a, Polygon $b, ?float $precision = null): Polygon
+Algorithm::difference(Polygon $a, Polygon $b, ?float $precision = null): Polygon  // A \ B
+Algorithm::xoring(Polygon $a, Polygon $b, ?float $precision = null): Polygon
 ```
 
 ### Operaciones n-arias
 
 ```php
-// Unión de múltiples polígonos (al menos uno requerido)
-Algorithm::unionMany(array $polygons): Polygon
+// Al menos un polígono; con uno solo se devuelve tal cual
+Algorithm::unionMany(array $polygons, ?float $precision = null): Polygon
+Algorithm::intersectMany(array $polygons, ?float $precision = null): Polygon
+Algorithm::xorMany(array $polygons, ?float $precision = null): Polygon
+Algorithm::differenceMany(array $polygons, ?float $precision = null): Polygon     // P0 \ P1 \ P2 ...
 ```
+
+### Precisión de los datos (`$precision`)
+
+Cuando las coordenadas vienen **redondeadas** (lo normal en GeoJSON, que suele traer
+7 decimales: ~1 cm), dos polígonos que comparten un borde, o un vértice que estaba
+exactamente sobre la arista vecina, quedan separados por unos milímetros. Esas aristas
+casi coincidentes hacen que el barrido tome decisiones contradictorias y se pierdan o
+añadan regiones enteras. Para evitarlo, antes de operar se **normalizan** las entradas
+(`InputNormalizer`): los vértices a menos de la tolerancia entre sí se unifican, y las
+aristas que pasan a menos de la tolerancia de un vértice se parten en ese vértice.
+Ninguna coordenada se mueve más que la tolerancia.
+
+| `$precision` | Comportamiento |
+|---|---|
+| `null` (por defecto) | Automático: si todas las coordenadas tienen como mucho entre 5 y 9 decimales, la tolerancia es ese cuanto (1e-7 con 7 decimales). Con enteros o con precisión completa no se normaliza. |
+| `0.0` | Sin normalización (comportamiento anterior). |
+| `> 0` | Tolerancia explícita, en unidades de las coordenadas (p.ej. `1e-7`). Útil con datos de precisión mezclada o en coordenadas no geográficas. |
+
+No sirve fijar una tolerancia más fina que la precisión de los datos (p.ej. 1 mm con
+datos de 7 decimales): el redondeo desplaza los vértices hasta ~8 mm y no se corregiría.
+Redondear las entradas a una rejilla tampoco: es precisamente lo que crea el problema.
+La normalización cuesta entre un 3 % y un 9 % del tiempo cuando actúa. Ver ISSUES.md #2.
+
+La API de bajo nivel (`segments()`, `combine()`, `polygon()`...) no normaliza.
 
 ### API de bajo nivel (para pipelines manuales)
 

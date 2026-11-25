@@ -39,7 +39,7 @@ at a time. Tick the box when an item is done.
 | [F3](#f3-single-geometry-fixtures-were-always-skipped) | 15 single-geometry fixtures always skipped | Medium | Fixed (`a11d7ab`) |
 | [F4](#f4-gjtools-collinear-removal-deleted-the-wrong-vertex) | GJTools collinear removal deleted the wrong vertex | High | Fixed (this branch) |
 | [1](#1-scale-dependent-tolerances-small-lonlat-features-give-wrong-results) | Scale-dependent tolerances: small lon/lat features give wrong results | High | Fixed (this branch) |
-| [2](#2-endpoint-snapping-tolerance-is-relative-to-segment-length) | Endpoint snapping tolerance is relative to segment length | High | Open, needs study |
+| [2](#2-endpoint-snapping-tolerance-is-relative-to-segment-length) | Endpoint snapping tolerance is relative to segment length | High | Fixed (this branch) |
 | [3](#3-fill-rule-for-overlapping-parts-and-duplicated-rings-is-undecided) | Fill rule for overlapping parts / duplicated rings undecided | Medium | Open, decision needed (behaviour is consistent) |
 | [4](#4-e2e-comparison-uses-the-library-itself-false-passes) | E2E comparison uses the library itself (false passes) | Medium | Open |
 | [5](#5-polygoncreate-leaves-isinverted-uninitialized) | `Polygon::create()` leaves `isInverted` uninitialized | Low | Open |
@@ -251,49 +251,122 @@ the old `Point.php`, so #13 also guards this fix.
 
 ### 2. Endpoint snapping tolerance is relative to segment length
 
-- [ ] Open. Needs its own study.
+- [x] Fixed on this branch: rounded inputs are normalized by default (`InputNormalizer`).
 
-**Severity:** High. It affects normal-sized features with typical 7-decimal GeoJSON.
+**Severity:** High. It affected normal-sized features with typical 7-decimal GeoJSON.
 
-**Problem.** `Point::__calcAlongUsingValue` (`Point.php:154`) snaps an
-intersection to a segment endpoint when the intersection lies within
-`TOLERANCE_SQRT = 1e-6` (`Algorithm.php:10`) **of the segment's length** from that
-endpoint. On a 10 km edge that is 1 cm, which is inconsistent with the 1e-12
-tolerances used everywhere else. When a vertex sits a few 1e-8° off a
-neighbour's edge (common after rounding to 7 decimals), it gets snapped, the other
-segment is split at a point that isn't on it, and the result is grossly wrong.
-This doesn't depend on scale; issue 1's fix doesn't touch it.
+**What the problem really was.** When the sweep finds edge A crossing edge B "almost
+at" B's endpoint, it doesn't split A at the true crossing. It assumes a T-junction
+and splits A **at B's endpoint** (`eventDivide($ev1, $b2)` in
+`Intersecter::checkIntersection`). "Almost" means within
+`TOLERANCE_SQRT = 1e-6` × |B| (`Point::__calcAlongUsingValue`), which is 3 cm on a
+30 km edge.
 
-**Repro** (≈10 km polygons near Madrid, 7 decimals). The union is wrong at 678 of
-2,000 random sample points:
+- **Origin of the 1e-6.** The initial port (April 2025) used polybooljs's single
+  epsilon, 1e-10, for this. On 2026-06-08 `TOLERANCE` went to 1e-12, but this test was
+  switched to `TOLERANCE_SQRT` (1e-6), "the square root of TOLERANCE, for squared
+  values". The value it compares isn't squared: it's a dimensionless position along
+  the segment. The snap became 10,000× looser than the original.
+- **The repro case.** Three snaps were applied to endpoints 1.4e-8–4.6e-8° (1.5–5 mm)
+  off the other edge: shared corners that rounding to 7 decimals had separated. Bending
+  an edge without re-checking its relations with other segments leaves the sweep
+  inconsistent, and a third of the union was lost.
+- **The snap is a symptom, not the root cause.** With a distance-based snap
+  (< 1e-12°, consistent with item 1) the repro passes, but other rounded grids still
+  fail (10–17 operations of 400), and an exact-data case that passes today breaks:
+  the snap also absorbs the floating-point error of computed crossings. No snap value
+  removes the failures; changing it only moves them.
+- **The real ingredient** is near-degenerate geometry at a scale larger than the
+  tolerance. The minimal case: three edges that were one straight line before rounding
+  to 7 decimals, now 0.3–2.4 mm apart at an angle of 1e-8 rad. Exact data: 0 failures.
+  The same data rounded to 7 decimals (how neighbouring parcels arrive in GeoJSON): up
+  to 5% of operations grossly wrong.
 
-```
-A = [[[-4.1161297,40.4826806],[-3.8667245,40.6494051],[-3.9778742,40.8156752],[-4.2272794,40.6489507]],
-     [[-3.6724398,40.5387099],[-3.4230347,40.7054344],[-3.5341843,40.8717045],[-3.7835895,40.70498]]]
-B = [[[-3.8111497,40.5662701],[-3.7280146,40.6218449],[-3.8947392,40.8712501],[-3.9778742,40.8156752]],
-     [[-4.088115,40.2608357],[-4.00498,40.3164105],[-4.0605548,40.3995456],[-4.1436899,40.3439707]],
-     [[-3.783135,40.3444252],[-3.4505949,40.5667245],[-3.6173194,40.8161297],[-3.9498596,40.5938303]]]
-Algorithm::union(A, B)   // compare with an even-odd point-in-polygon test of A ∪ B
-```
+**Other libraries** (same 802 polygon pairs, each checked against its own fill rule):
 
-A computed intersection at `-3.8667245461813025,40.64940515255276` is 4.6e-8 from
-A's vertex `-3.8667245,40.6494051` and is snapped onto it.
+| Library | Approach | Rounded grids, 7 decimals |
+|---|---|---|
+| polybooljs 1.2.2 (origin of this port) | parametric snap, eps 1e-10 | 14–46% failures, mostly exceptions |
+| martinez-polygon-clipping 0.9.1 | exact `orient2d` + 4-ulp snap | 1–2%, and 4.5% even on exact data |
+| polygon-clipping 0.15.7 | T-junction only if on the line to machine precision; all crossings rounded to previously seen coordinates | 0–1% (exceptions) |
+| Clipper 6.4.2 | integer coordinates; every crossing rounded to the grid | 0% |
+| jsts 2.12.1 (JTS) | snapping with tolerance, snap rounding if topology is inconsistent | 0% wrong (some exceptions) |
+| this library before the fix | parametric snap, 1e-6 | 0–4.75% |
 
-**Experiment.** With only `TOLERANCE_SQRT = 1e-9`, the repro drops from 678 to
-25 wrong points. Combined with issue 1's fix, the rotated-grid fuzz with 7-decimal
-rounding goes from 4–10% wrong to 0%. But `tests.php` #8 starts failing, so the
-constant can't simply be changed.
+The literature agrees. Epsilon tests inside predicates give contradictory decisions
+that no epsilon can fix (Kettner et al. 2004/2008). The accepted remedy is consistent,
+global rounding: snap rounding (Greene; Hobby 1999; Halperin & Packer's iterated snap
+rounding), or Milenkovic's "data normalization" (1988): before operating, move vertices
+within ε of an edge onto it and split the edge there (*vertex shifting* + *edge
+cracking*), until nothing changes. polybooljs had the same debate (PR #8, 2017, scale
+epsilon by segment length; never merged).
 
-**Proposed fix.** Make snapping a *length* test consistent with `compare()`: snap
-when the distance from the intersection to the endpoint is below a length
-tolerance, instead of comparing the parameter `t` against 1e-6. Then investigate
-`tests.php` #8: decide whether its expected output depends on the over-eager
-snapping, or whether #8 exposes a case the new rule must handle.
+**Fix.** `InputNormalizer` applies Milenkovic's normalization to all operands together
+before every public operation (`union`, `intersect`, `difference`, `xoring`, `*Many`):
+vertices closer than the tolerance are unified, and edges passing closer than the
+tolerance to a vertex are split at it, repeated until stable. No coordinate moves more
+than the tolerance. Grid indexes keep it near-linear (~30 ms for Europe + a shifted
+copy). New optional parameter `?float $precision` on all those operations:
 
-**Verify.** The repro above should give 0 wrong points. Add a `ROUND=7` variant
-(round all generated coordinates to 7 decimals) to `RandomizedClippingTest`; the
-`rotgrid` generator at 0.1° scale near (-3.7, 40.4) should then pass. Run
-`tests.php` and PHPUnit.
+- `null` (default): **automatic**. If every coordinate has at most 5–9 decimals, the
+  tolerance is that quantum (1e-7 for 7 decimals). Integers or full-precision data are
+  not normalized: there's no way to tell "exact integers" from "rounded to integers",
+  and tolerance 1 would destroy integer geometry (tested: it breaks
+  `issue-36`, `issue-38` and `multipolys-with-disjoint-polys`).
+- `0.0`: disabled (previous behaviour).
+- `> 0`: explicit tolerance in coordinate units.
+
+The low-level API (`segments()`, `combine()`, `polygon()`) doesn't normalize.
+
+**Alternatives measured and rejected:**
+
+| Alternative | Result |
+|---|---|
+| Lower the sweep snap to 1e-8 ("phase 0") | All existing tests pass and the repro is fixed, but rounded-grid failures only drop 78 → 32 of 2,400, and get worse at 0.001° (0 → 6). Not applied. |
+| Distance-based sweep snap (< 1e-12°) | Repro fixed, but an exact-data case breaks. |
+| Fixed 1 mm floor (normalize with 1e-8) | Not enough for 7 decimals: rounding moves vertices up to ~8 mm (6–13 failures of 300 remain). |
+| Round inputs to a 1 mm grid | Makes it worse: exact data goes from 0 to 16 failures of 300. Rounding is what creates the problem. |
+| Validate and retry (JTS style), integers / snap rounding (Clipper style) | Much larger changes; not needed given the results below. |
+
+**Verification done.**
+
+- Strategy matrix (rounded grids with 6, 7 and 9 decimals, exact grids, tiles,
+  1 m stars; 300 operations each): automatic normalization gives **0 failures
+  everywhere**, against 2–23 before.
+- `php tests.php`: 20/20 (#13 has 15-decimal coordinates, so it isn't normalized).
+- `vendor/bin/phpunit`: 308 tests OK. New: `tests/InputNormalizerTest.php` (14 tests:
+  detection, unification, edge cracking, explicit and disabled precision, `*Many`) and a
+  `geojson` placement in `RandomizedClippingTest` (rounded to 7 decimals; 2 of its 14
+  cases fail with normalization disabled). Deep pass (`FUZZ_ITERS=60 FUZZ_SEEDS=4`): OK.
+- Progress suite: both `testIssue02_*` checks pass.
+- Speed: +3–9% when normalization applies (Europe 0.584 → 0.604–0.635 s); detection alone
+  is 7 ms on Europe, whose 12-decimal data isn't normalized. `tests.php` shows no
+  measurable difference.
+- PHPStan: no new findings (32, as before).
+
+**Remaining limitations.**
+
+- Full-precision data (≥ 10 decimals) with near-degenerate geometry at the mm scale is
+  not normalized automatically (for example, reprojected data). Pass an explicit
+  `$precision` in that case.
+- Mixed-precision inputs (some coordinates with 7 decimals, others with 15): detection
+  sees 15 and doesn't normalize, so the behaviour is the same as before. Pass an
+  explicit `$precision`.
+- With normalization, features smaller than the data quantum collapse (e.g. a 1 mm
+  triangle in 7-decimal data); they aren't representable at that precision anyway.
+- The sweep's `TOLERANCE_SQRT` (1e-6) stays as it is; with normalization its value no
+  longer affects the rounded-data results. Its comment and the README now describe what
+  it really is.
+
+**Sources.**
+[Hobby 1999](https://www.nokia.com/bell-labs/publications-and-media/publications/practical-segment-intersection-with-finite-precision-output) ·
+[Iterated snap rounding](https://www.cgl.cs.tau.ac.il/projects/iterated-snap-rounding/) ·
+[Kettner et al.](https://cs.nyu.edu/~exact/doc/classroom.pdf) ·
+[Milenkovic 1988](https://www.bohrium.com/paper-details/verifiable-implementations-of-geometric-algorithms-using-finite-precision-arithmetic/812418101453783041-2508) ·
+[JTS OverlayNGRobust](https://locationtech.github.io/jts/javadoc/org/locationtech/jts/operation/overlayng/OverlayNGRobust.html) ·
+[Clipper2 robustness](https://angusj.com/clipper2/Docs/Robustness.htm) ·
+[polybooljs PR #8](https://gh.ali360.cloudns.ch/velipso/polybooljs/pull/8) ·
+[martinez issue #155](https://www.github.com/w8r/martinez/issues/155)
 
 ### 3. Fill rule for overlapping parts and duplicated rings is undecided
 
@@ -494,6 +567,10 @@ Also consider running PHPStan in CI (see [10](#10-repository-and-ci-hygiene)).
   the lock with `composer update`.
 - [x] **Required PHP extensions** (`dom`, `mbstring`, `xmlwriter`) are documented
   in the README's Testing section.
+- [x] **README documented methods that don't exist** (`Algorithm::intersection`,
+  `Algorithm::differenceRev`) and described `TOLERANCE`/`TOLERANCE_SQRT` wrongly
+  ("≈ 1 mm", "for squared values"). Fixed together with item 2; the API section now
+  lists the real methods, including the `*Many` ones.
 
 ---
 
