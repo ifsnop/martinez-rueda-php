@@ -68,13 +68,18 @@ final class GeometryOracle
      *
      * @return string[]
      */
-    public static function check(array $A, array $B, int $samples = 300): array
+    /**
+     * $minEps: distancia mínima a las aristas por debajo de la cual un punto no se evalúa.
+     * Con datos redondeados conviene pasar ~2 cuantos: la normalización de entradas
+     * (InputNormalizer) puede mover las aristas hasta un cuanto, y esos puntos son ambiguos.
+     */
+    public static function check(array $A, array $B, int $samples = 300, float $minEps = 0.0): array
     {
         $all = array_merge(...array_merge($A, $B));
         $xs = array_column($all, 0);
         $ys = array_column($all, 1);
         [$minx, $maxx, $miny, $maxy] = [min($xs), max($xs), min($ys), max($ys)];
-        $eps = 1e-6 * max($maxx - $minx, $maxy - $miny);
+        $eps = max(1e-6 * max($maxx - $minx, $maxy - $miny), $minEps);
         $pts = [];
         for ($k = 0; $k < $samples; $k++) {
             $pts[] = [PolygonGenerator::rnd($minx, $maxx), PolygonGenerator::rnd($miny, $maxy)];
@@ -135,7 +140,8 @@ final class GeometryOracle
             [$A, $B] = PolygonGenerator::generate($gen);
             $A = PolygonGenerator::transform($A, $offset, $scale, $round);
             $B = PolygonGenerator::transform($B, $offset, $scale, $round);
-            foreach (self::check($A, $B) as $p) {
+            $minEps = $round === null ? 0.0 : 2 * 10 ** -$round;
+            foreach (self::check($A, $B, 300, $minEps) as $p) {
                 $problems[] = "(iter $it) $p";
             }
         }

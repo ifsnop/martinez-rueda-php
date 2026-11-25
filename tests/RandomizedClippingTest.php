@@ -25,11 +25,12 @@ include_once('autoloader.php');
  */
 final class RandomizedClippingTest extends TestCase
 {
-    /** Desplazamiento/escala para simular coordenadas lon/lat habituales. */
+    /** [desplazamiento, escala, decimales] para simular coordenadas lon/lat habituales. */
     private const PLACEMENTS = [
-        'unit'   => [0.0, 1.0],
-        'lonlat' => [-3.7, 0.01],   // rasgos de ~1-10 km en grados, cerca de Madrid
-        'metre'  => [-3.7, 1e-5],   // rasgos de ~1-5 m en grados (edificios, parcelas): ISSUES.md #1
+        'unit'    => [0.0, 1.0, null],
+        'lonlat'  => [-3.7, 0.01, null],          // rasgos de ~1-10 km en grados, cerca de Madrid
+        'metre'   => [-3.7, 1e-5, null],          // rasgos de ~1-5 m en grados (edificios, parcelas): ISSUES.md #1
+        'geojson' => [[-3.7, 40.4], 0.02, 7],     // ~1-15 km, redondeado a 7 decimales como un GeoJSON: ISSUES.md #2
     ];
 
     public static function provideCases(): array
@@ -37,9 +38,9 @@ final class RandomizedClippingTest extends TestCase
         $seeds = (int)(getenv('FUZZ_SEEDS') ?: 2);
         $cases = [];
         foreach (array_keys(PolygonGenerator::GENERATORS) as $gen) {
-            foreach (self::PLACEMENTS as $pname => [$offset, $scale]) {
+            foreach (self::PLACEMENTS as $pname => [$offset, $scale, $round]) {
                 for ($seed = 1; $seed <= $seeds; $seed++) {
-                    $cases["$gen/$pname/seed$seed"] = [$gen, $seed, $offset, $scale];
+                    $cases["$gen/$pname/seed$seed"] = [$gen, $seed, $offset, $scale, $round];
                 }
             }
         }
@@ -49,10 +50,10 @@ final class RandomizedClippingTest extends TestCase
     /**
      * @dataProvider provideCases
      */
-    public function testOperationsMatchPointOracle(string $gen, int $seed, float $offset, float $scale): void
+    public function testOperationsMatchPointOracle(string $gen, int $seed, float|array $offset, float $scale, ?int $round): void
     {
         $iters = (int)(getenv('FUZZ_ITERS') ?: 20);
-        $failures = GeometryOracle::fuzz($gen, $seed, $iters, $offset, $scale);
+        $failures = GeometryOracle::fuzz($gen, $seed, $iters, $offset, $scale, $round);
 
         $this->assertSame(
             [],

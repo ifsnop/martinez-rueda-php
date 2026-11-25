@@ -7,7 +7,12 @@ namespace Ifsnop\MartinezRueda;
 final class Algorithm
 {
     public const TOLERANCE = 1e-12; // 1e-8 equivale a un milímetro en la superficie terrestre
-    public const TOLERANCE_SQRT = 1e-6; // raíz cuadrada de TOLERANCE, para comparaciones de valores que ya han sido elevados al cuadrado
+    // Tolerancia ADIMENSIONAL (fracción de la longitud del segmento) con la que el barrido
+    // considera que un cruce cae en un extremo (Point::__calcAlongUsingValue). No es la raíz
+    // de nada: el parámetro que compara no está elevado al cuadrado. Absorbe el error de
+    // coma flotante de los puntos de cruce calculados; los desplazamientos reales de datos
+    // redondeados los corrige la normalización de entradas (InputNormalizer, ISSUES.md #2).
+    public const TOLERANCE_SQRT = 1e-6;
     public const DEBUG = false;
     public const TOLERANCE_INV = 1.0 / Algorithm::TOLERANCE;
 
@@ -627,31 +632,50 @@ final class Algorithm
         return [$ring];
     }
 
+    /**
+     * Normaliza los operandos antes de operar (ISSUES.md #2, ver InputNormalizer).
+     *
+     * $precision: null = detectar la precisión de los datos (por defecto; solo actúa con
+     * coordenadas de 5 a 9 decimales), 0 = no normalizar, > 0 = tolerancia explícita.
+     *
+     * @param Polygon[] $polygons
+     * @return Polygon[]
+     */
+    private static function normalizeInputs(array $polygons, ?float $precision): array
+    {
+        $tol = $precision ?? InputNormalizer::detectPrecision($polygons);
+        return $tol > 0.0 ? InputNormalizer::normalize($polygons, $tol) : $polygons;
+    }
+
     // ── Operaciones binarias (dos polígonos) ──────────────────────────────────
 
-    public static function union(Polygon $polygon1, Polygon $polygon2): Polygon
+    public static function union(Polygon $polygon1, Polygon $polygon2, ?float $precision = null): Polygon
     {
+        [$polygon1, $polygon2] = self::normalizeInputs([$polygon1, $polygon2], $precision);
         return self::polygon(
             self::unionSegments(self::segments($polygon1), self::segments($polygon2))
         );
     }
 
-    public static function intersect(Polygon $polygon1, Polygon $polygon2): Polygon
+    public static function intersect(Polygon $polygon1, Polygon $polygon2, ?float $precision = null): Polygon
     {
+        [$polygon1, $polygon2] = self::normalizeInputs([$polygon1, $polygon2], $precision);
         return self::polygon(
             self::intersectSegments(self::segments($polygon1), self::segments($polygon2))
         );
     }
 
-    public static function difference(Polygon $polygon1, Polygon $polygon2): Polygon
+    public static function difference(Polygon $polygon1, Polygon $polygon2, ?float $precision = null): Polygon
     {
+        [$polygon1, $polygon2] = self::normalizeInputs([$polygon1, $polygon2], $precision);
         return self::polygon(
             self::differenceSegments(self::segments($polygon1), self::segments($polygon2))
         );
     }
 
-    public static function xoring(Polygon $polygon1, Polygon $polygon2): Polygon
+    public static function xoring(Polygon $polygon1, Polygon $polygon2, ?float $precision = null): Polygon
     {
+        [$polygon1, $polygon2] = self::normalizeInputs([$polygon1, $polygon2], $precision);
         return self::polygon(
             self::xorSegments(self::segments($polygon1), self::segments($polygon2))
         );
@@ -659,7 +683,7 @@ final class Algorithm
 
     // ── Operaciones n-arias (array de polígonos) ──────────────────────────────
 
-    public static function unionMany(array $polygons): Polygon
+    public static function unionMany(array $polygons, ?float $precision = null): Polygon
     {
         $n = count($polygons);
         if ( 0 === $n ) {
@@ -669,6 +693,7 @@ final class Algorithm
 	    $key = array_key_first($polygons);
             return $polygons[$key]; // identidad
         }
+        $polygons = self::normalizeInputs($polygons, $precision);
         $items = self::polygonsToSegments($polygons);
         $result = self::reduceBalanced(
             $items,
@@ -678,7 +703,7 @@ final class Algorithm
         return self::polygon($result);
     }
 
-    public static function intersectMany(array $polygons): Polygon
+    public static function intersectMany(array $polygons, ?float $precision = null): Polygon
     {
         $n = count($polygons);
         if ( 0 === $n ) {
@@ -688,6 +713,7 @@ final class Algorithm
 	    $key = array_key_first($polygons);
             return $polygons[$key]; // identidad
         }
+        $polygons = self::normalizeInputs($polygons, $precision);
         $items = self::polygonsToSegments($polygons);
         $result = self::reduceBalanced(
             $items,
@@ -696,7 +722,7 @@ final class Algorithm
         return self::polygon($result);
     }
 
-    public static function xorMany(array $polygons): Polygon
+    public static function xorMany(array $polygons, ?float $precision = null): Polygon
     {
         $n = count($polygons);
         if ( 0 === $n ) {
@@ -706,6 +732,7 @@ final class Algorithm
 	    $key = array_key_first($polygons);
             return $polygons[$key]; // identidad
         }
+        $polygons = self::normalizeInputs($polygons, $precision);
         $items = self::polygonsToSegments($polygons);
         $result = self::reduceBalanced(
             $items,
@@ -714,7 +741,7 @@ final class Algorithm
         return self::polygon($result);
     }
 
-    public static function differenceMany(array $polygons): Polygon
+    public static function differenceMany(array $polygons, ?float $precision = null): Polygon
     {
         // Nota importante para differenceMany: polygonsToSegments no debe usarse aquí porque
         // ordena el array por bounding box. Para difference el orden es semánticamente
@@ -729,6 +756,7 @@ final class Algorithm
 	    $key = array_key_first($polygons);
             return $polygons[$key]; // identidad
         }
+        $polygons = self::normalizeInputs($polygons, $precision);
         // ((subject \ mask1) \ mask2) \ ...
         $result = self::segments($polygons[0]);
         for ($i = 1; $i < $n; $i++) {
