@@ -38,7 +38,7 @@ at a time. Tick the box when an item is done.
 | [F2](#f2-phpstan-never-analysed-any-file) | PHPStan never analysed any file | Low | Fixed (`45bdeee`) |
 | [F3](#f3-single-geometry-fixtures-were-always-skipped) | 15 single-geometry fixtures always skipped | Medium | Fixed (`a11d7ab`) |
 | [F4](#f4-gjtools-collinear-removal-deleted-the-wrong-vertex) | GJTools collinear removal deleted the wrong vertex | High | Fixed (this branch) |
-| [1](#1-scale-dependent-tolerances-small-lonlat-features-give-wrong-results) | Scale-dependent tolerances: small lon/lat features give wrong results | High | Open, fix proposed and tested |
+| [1](#1-scale-dependent-tolerances-small-lonlat-features-give-wrong-results) | Scale-dependent tolerances: small lon/lat features give wrong results | High | Fixed (this branch) |
 | [2](#2-endpoint-snapping-tolerance-is-relative-to-segment-length) | Endpoint snapping tolerance is relative to segment length | High | Open, needs study |
 | [3](#3-fill-rule-for-overlapping-parts-and-duplicated-rings-is-undecided) | Fill rule for overlapping parts / duplicated rings undecided | Medium | Open, decision needed (behaviour is consistent) |
 | [4](#4-e2e-comparison-uses-the-library-itself-false-passes) | E2E comparison uses the library itself (false passes) | Medium | Open |
@@ -126,7 +126,7 @@ treated as degenerate by GJTools too, which is consistent with
 
 ### 1. Scale-dependent tolerances: small lon/lat features give wrong results
 
-- [ ] Open. Fix proposed and tested, not applied.
+- [x] Fixed on this branch: the patch below is applied to `Point.php`.
 
 **Severity:** High for anyone clipping small features (buildings, parcels) in degrees.
 
@@ -230,19 +230,24 @@ untouched. The length is the L1 norm, which avoids `sqrt`/`max()`; it is between
 - Features smaller than about 1e-9° (0.1 mm) still fail. Don't lower TOLERANCE to
   compensate: the float spacing at 180° is 2.8e-14.
 
-**Side effect to handle.** `tests.php` case #13 fails with the fix. The output
-keeps a real 5.4e-10° (≈60 µm) step at `[40.49956209027567,-3.5237618118787744]`
-that the old tolerance removed. #13 was added to guard exactly this kind of
-almost-collinear case, so update its expected output (or compare with a tolerance)
-after checking the new vertex by hand.
+**Side effect (handled).** With the fix, `tests.php` case #13 keeps one more
+vertex, `[40.49956209027567,-3.5237618118787744]`. Checked by hand: it is exactly
+where B's top edge crosses A's left edge, 5.4e-10° (≈60 µm) below A's top-left
+corner. The old area test called the three points collinear
+(|cross| = 3.8e-13 < 1e-12) and dropped it, cutting off a sliver of about
+1.9e-13 deg². The expected output of #13 now includes the vertex. It fails with
+the old `Point.php`, so #13 also guards this fix.
 
-**Verify.**
+**Verification done.**
 
-1. `php tests.php`: only #13 changes; check it as described above.
-2. `vendor/bin/phpunit`: `very-small-polygon::union` should pass for real once
-   [4](#4-e2e-comparison-uses-the-library-itself-false-passes) is fixed.
-3. Add a lon/lat small-scale placement to `RandomizedClippingTest::PLACEMENTS`,
-   for example `'small' => [-3.7, 1e-5]`. It fails before the fix and passes after.
+1. `php tests.php`: 20/20, with #13 updated as above. Runtime 0.65 s vs 0.62 s
+   (+5%).
+2. `vendor/bin/phpunit`: OK. `very-small-polygon::union` passes for real and is
+   no longer in `KNOWN_DEVIATIONS`.
+3. `RandomizedClippingTest::PLACEMENTS` has a new `'metre' => [-3.7, 1e-5]`
+   placement (features of 1–5 m): 14 cases, 5 of them fail with the old code.
+   A deeper pass (`FUZZ_ITERS=100 FUZZ_SEEDS=3`) passes everywhere.
+4. Progress suite: the three `testIssue01_*` checks pass.
 
 ### 2. Endpoint snapping tolerance is relative to segment length
 
@@ -343,9 +348,11 @@ falls back to `comparePolygons()` (line 99), which computes `xor(got, expected)`
 **with the library under test** and checks that the result is empty. Any bug the
 library has in `xor` hides the same bug in the operation being tested.
 
-**Proof.** `very-small-polygon::union` currently **passes**, although the library
-returns `[]` for it. `xor([], 1-cm triangle)` is also `[]`, because of issue 1, so
-the harness concludes they're equal.
+**Proof.** Before issue 1 was fixed, `very-small-polygon::union` **passed**
+although the library returned `[]` for it: `xor([], 1-cm triangle)` was also `[]`,
+so the harness concluded they were equal. Issue 1's fix removed that particular
+symptom, but the harness still trusts the library under test, so any future `xor`
+bug would hide bugs elsewhere in the same way.
 
 **Proposed fix.** Compare with an independent method. Use the point-sampling
 oracle in `tests/Support/GeometryOracle.php` (`inside()` on random points inside both
@@ -353,8 +360,9 @@ results' bounding box, skipping points near edges), or compare areas plus a
 sampled symmetric difference. Keep the exact coordinate comparison as the first,
 fast check.
 
-**Verify.** `very-small-polygon::union` must fail (or be reported as a known
-deviation) until issue 1 is fixed, and pass after.
+**Verify.** `testIssue04_e2eComparisonDoesNotCallTheLibrary` passes (the
+symptom check `testIssue04_e2eComparisonRejectsEmptyVersusTinyPolygon` already
+passes since issue 1 was fixed, so it no longer shows whether the harness is fixed).
 
 ### 5. `Polygon::create()` leaves `isInverted` uninitialized
 

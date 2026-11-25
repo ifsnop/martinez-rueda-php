@@ -29,6 +29,7 @@ final class RandomizedClippingTest extends TestCase
     private const PLACEMENTS = [
         'unit'   => [0.0, 1.0],
         'lonlat' => [-3.7, 0.01],   // rasgos de ~1-10 km en grados, cerca de Madrid
+        'metre'  => [-3.7, 1e-5],   // rasgos de ~1-5 m en grados (edificios, parcelas): ISSUES.md #1
     ];
 
     public static function provideCases(): array

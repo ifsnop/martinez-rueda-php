@@ -20,9 +20,9 @@ final class PolygonClippingE2ETest extends TestCase
     private const EVEN_ODD = 'la entrada es un MultiPolygon cuyas partes se solapan; esta librería '
         . 'aplica la regla par-impar (el solape se cancela) y polygon-clipping las une. '
         . 'El resultado coincide con la interpretación par-impar de la entrada.';
-    private const SUB_TOLERANCE = 'polígono diminuto: sus productos vectoriales (≈ área) quedan por debajo de '
-        . 'Algorithm::TOLERANCE (1e-12, absoluta), la librería lo descarta como degenerado y polygon-clipping '
-        . 'lo conserva. Relacionado con la dependencia de la escala de coordenadas.';
+    private const SUB_TOLERANCE = 'polígono más estrecho que Algorithm::TOLERANCE (1e-12, por debajo de la '
+        . 'precisión de float en esas coordenadas): la librería lo descarta como degenerado y polygon-clipping '
+        . 'lo conserva. Limitación aceptada (ISSUES.md, "Known limitations").';
     private const KNOWN_DEVIATIONS = [
         'issue-61::union'                         => self::EVEN_ODD,
         'issue-61-2::union'                       => self::EVEN_ODD,
@@ -35,7 +35,6 @@ final class PolygonClippingE2ETest extends TestCase
         'nearly-vertical-segment::union'          => self::SUB_TOLERANCE,
         'thin-vertical-triangle::union'           => self::SUB_TOLERANCE,
         'thin-vertical-triangle-2::union'         => self::SUB_TOLERANCE,
-        'very-small-polygon::union'               => self::SUB_TOLERANCE,
     ];
 
     // ==========================

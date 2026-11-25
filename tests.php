@@ -150,6 +150,10 @@ $test = [
 				[40.49956594138672017, -3.52412157266717774],
 				[40.49886780983072043, -3.52414766969279381],
 				[40.49886093066323411, -3.52376958746416902],
+				// Cruce del lado superior de B con el lado izquierdo de A, 5.4e-10 (~60 µm)
+				// por debajo de la esquina de A. Con la tolerancia de área (antes de
+				// ISSUES.md #1) se eliminaba por "colineal" (|cross| = 3.8e-13 < 1e-12).
+				[40.49956209027567, -3.5237618118787744],
 			]],
 		],
 	],
