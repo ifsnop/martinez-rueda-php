@@ -633,18 +633,30 @@ final class Algorithm
     }
 
     /**
-     * Normaliza los operandos antes de operar (ISSUES.md #2, ver InputNormalizer).
+     * Normaliza los operandos antes de operar (ver InputNormalizer).
      *
-     * $precision: null = detectar la precisión de los datos (por defecto; solo actúa con
-     * coordenadas de 5 a 9 decimales), 0 = no normalizar, > 0 = tolerancia explícita.
+     * Siempre se normaliza al menos con la tolerancia aritmética de la librería
+     * (TOLERANCE, ISSUES.md #11): los puntos que los predicados consideran iguales pasan a
+     * ser idénticos, y una arista que pasa a menos de TOLERANCE de un vértice se parte en
+     * él. Sin esto, resultados encadenados (vértices calculados en operaciones distintas
+     * que difieren en unos ulps) contradicen a los predicados y el barrido puede perder
+     * regiones enteras. No depende de los datos.
+     *
+     * Encima, la precisión de los datos (ISSUES.md #2):
+     *   null = detectarla (coordenadas de 5 a 9 decimales; por defecto),
+     *   > 0  = explícita (se usa max(TOLERANCE, $precision)),
+     *   0    = desactiva toda normalización (comportamiento anterior a #2 y #11).
      *
      * @param Polygon[] $polygons
      * @return Polygon[]
      */
     private static function normalizeInputs(array $polygons, ?float $precision): array
     {
-        $tol = $precision ?? InputNormalizer::detectPrecision($polygons);
-        return $tol > 0.0 ? InputNormalizer::normalize($polygons, $tol) : $polygons;
+        if ($precision === 0.0) {
+            return $polygons;
+        }
+        $tol = max($precision ?? InputNormalizer::detectPrecision($polygons), self::TOLERANCE);
+        return InputNormalizer::normalize($polygons, $tol);
     }
 
     // ── Operaciones binarias (dos polígonos) ──────────────────────────────────

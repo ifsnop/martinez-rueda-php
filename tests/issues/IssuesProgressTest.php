@@ -279,6 +279,13 @@ final class IssuesProgressTest extends TestCase
             $this->fail('Polygon::create() como operando lanza: ' . $e->getMessage());
         }
         $this->ok(GeometryOracle::inside($r->getArray(), 0.5, 0.5), 'union(vacío, cuadrado) no contiene el cuadrado');
+        // Las operaciones públicas normalizan (y reconstruyen) los polígonos, lo que tapa el
+        // fallo; la API de bajo nivel usa el polígono tal cual.
+        try {
+            Algorithm::segments(Polygon::create());
+        } catch (\Error $e) {
+            $this->fail('Algorithm::segments(Polygon::create()) lanza: ' . $e->getMessage());
+        }
     }
 
     // ── 6. *Many() con un solo polígono ──────────────────────────────────────
@@ -315,6 +322,18 @@ final class IssuesProgressTest extends TestCase
                 'GJTools lanza excepción por un hueco degenerado, pero GJToolsTest dice que debe ignorarse. Decidir el contrato.'
             );
         }
+    }
+
+    // ── 11. Resultados encadenados con vértices que difieren en unos ulps ─────
+
+    /** 11: unión de dos piezas cuyo vértice común difiere en ~4 ulps; salía vacía. */
+    public function testIssue11_chainedResultsWithVerticesDifferingInAFewUlps(): void
+    {
+        $s = [[[-4.198542751508911, 40.46079948281863], [-4.198043193580838, 40.46064771317846], [-4.173255741665298, 40.47733405872846]]];
+        $i = [[[-4.0337834162637805, 40.444787067928594], [-4.201429297374132, 40.458368265571025],
+               [-4.173255741665326, 40.47733405872843], [-4.117957492323765, 40.51455957508919]]];
+        $this->ok(Algorithm::union(self::poly($s), self::poly($i))->getArray() !== [], 'la unión sale vacía');
+        $this->assertNoProblems(GeometryOracle::check($s, $i, 2000), 'caso mínimo de ISSUES.md #11');
     }
 
     // ── 8. pointKey y coordenadas proyectadas ────────────────────────────────
