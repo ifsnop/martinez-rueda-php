@@ -41,6 +41,24 @@ final class GeometryOracle
         return $in;
     }
 
+    /**
+     * Número de puntos de $pts mal clasificados en el resultado $R de una operación
+     * (anillos de A, B y R; $truth = verdad booleana de la operación). Los puntos a menos
+     * de $eps de alguna arista no cuentan. La distancia solo se calcula para los puntos
+     * que discrepan, así que es barato aunque los polígonos tengan miles de vértices.
+     */
+    public static function countWrong(array $A, array $B, array $R, callable $truth, array $pts, float $eps): int
+    {
+        $wrong = 0;
+        foreach ($pts as [$x, $y]) {
+            if (self::inside($R, $x, $y) !== $truth(self::inside($A, $x, $y), self::inside($B, $x, $y))
+                && !self::nearEdge([$A, $B, $R], $x, $y, $eps)) {
+                $wrong++;
+            }
+        }
+        return $wrong;
+    }
+
     public static function nearEdge(array $ringSets, float $x, float $y, float $eps): bool
     {
         foreach ($ringSets as $rings) {
@@ -105,19 +123,9 @@ final class GeometryOracle
                     }
                 }
             }
-            $wrong = 0;
-            $checked = 0;
-            foreach ($pts as [$x, $y]) {
-                if (self::nearEdge([$A, $B, $R], $x, $y, $eps)) {
-                    continue;
-                }
-                $checked++;
-                if (self::inside($R, $x, $y) !== $truth(self::inside($A, $x, $y), self::inside($B, $x, $y))) {
-                    $wrong++;
-                }
-            }
+            $wrong = self::countWrong($A, $B, $R, $truth, $pts, $eps);
             if ($wrong > 0) {
-                $problems[] = "$name: $wrong/$checked puntos mal clasificados" . PHP_EOL
+                $problems[] = "$name: $wrong/" . count($pts) . " puntos mal clasificados" . PHP_EOL
                     . "  A = " . json_encode($A) . PHP_EOL
                     . "  B = " . json_encode($B) . PHP_EOL
                     . "  R = " . json_encode($R);

@@ -41,7 +41,7 @@ at a time. Tick the box when an item is done.
 | [1](#1-scale-dependent-tolerances-small-lonlat-features-give-wrong-results) | Scale-dependent tolerances: small lon/lat features give wrong results | High | Fixed (this branch) |
 | [2](#2-endpoint-snapping-tolerance-is-relative-to-segment-length) | Endpoint snapping tolerance is relative to segment length | High | Fixed (this branch) |
 | [3](#3-fill-rule-for-overlapping-parts-and-duplicated-rings-is-undecided) | Fill rule for overlapping parts / duplicated rings undecided | Medium | Open, decision needed (behaviour is consistent) |
-| [4](#4-e2e-comparison-uses-the-library-itself-false-passes) | E2E comparison uses the library itself (false passes) | Medium | Open |
+| [4](#4-e2e-comparison-uses-the-library-itself-false-passes) | E2E comparison uses the library itself (false passes) | Medium | Fixed (this branch) |
 | [5](#5-polygoncreate-leaves-isinverted-uninitialized) | `Polygon::create()` leaves `isInverted` uninitialized | Low | Open |
 | [6](#6-many-with-a-single-polygon-return-the-raw-input) | `*Many()` with a single polygon return the raw input | Low | Open |
 | [7](#7-gjtools-rejects-the-whole-input-when-one-ring-is-degenerate) | GJTools rejects the whole input when one ring is degenerate | Low | Open, decision needed |
@@ -412,30 +412,61 @@ the 8 fixtures should leave `KNOWN_DEVIATIONS`.
 
 ### 4. E2E comparison uses the library itself (false passes)
 
-- [ ] Open.
+- [x] Fixed on this branch.
 
-**Severity:** Medium. It hides bugs.
+**Severity:** Medium. It hid bugs.
 
-**Problem.** When the coordinate comparison fails, `tests/PolygonClippingE2ETest.php`
-falls back to `comparePolygons()` (line 99), which computes `xor(got, expected)`
-**with the library under test** and checks that the result is empty. Any bug the
-library has in `xor` hides the same bug in the operation being tested.
+**Problems found** (three, not one):
 
-**Proof.** Before issue 1 was fixed, `very-small-polygon::union` **passed**
-although the library returned `[]` for it: `xor([], 1-cm triangle)` was also `[]`,
-so the harness concluded they were equal. Issue 1's fix removed that particular
-symptom, but the harness still trusts the library under test, so any future `xor`
-bug would hide bugs elsewhere in the same way.
+1. `PolygonClippingE2ETest::comparePolygons()` decided whether two results were equal
+   with `xor(got, expected)` **computed by the library under test**, so a bug in `xor`
+   hid bugs in every operation. Before item 1 was fixed, `very-small-polygon::union`
+   passed although the library returned `[]`.
+2. The "exact" comparison before it, `compareCoordinates()`, accepted differences of
+   **0.1 per coordinate** (`almostEqual`), which is 11 km in lon/lat. The expected
+   output was also loaded through `GJTools`, which is part of the library (the F4 bug
+   affected it).
+3. The continent checks in `tests.php` only compared the **number of vertices**
+   (`numPoints == 1340`). Also, `$fail` was reset after them, so a continent FAIL never
+   changed the exit code or CI.
 
-**Proposed fix.** Compare with an independent method. Use the point-sampling
-oracle in `tests/Support/GeometryOracle.php` (`inside()` on random points inside both
-results' bounding box, skipping points near edges), or compare areas plus a
-sampled symmetric difference. Keep the exact coordinate comparison as the first,
-fast check.
+**Fix.**
 
-**Verify.** `testIssue04_e2eComparisonDoesNotCallTheLibrary` passes (the
-symptom check `testIssue04_e2eComparisonRejectsEmptyVersusTinyPolygon` already
-passes since issue 1 was fixed, so it no longer shows whether the harness is fixed).
+- `tests/Support/RegionComparator.php`: an independent comparison. Every vertex of each
+  region lies within δ of the other's boundary (both ways; finds missing or extra
+  pieces however small or far, lost holes, moved vertices). Same even-odd interior at
+  2,000 deterministic sample points away from the boundaries (finds swapped insides).
+  δ = 1e-10 × coordinate magnitude, instead of 0.1. Ring order, start vertex,
+  orientation and extra collinear vertices don't matter. Edge lookups use a grid index
+  (`tests/Support/BoundaryIndex.php`).
+- The E2E harness reads the expected GeoJSON directly (no `GJTools`) and compares it
+  with the library's raw output. `compareCoordinates()` and `almostEqual()` were
+  removed.
+- `tests.php` continents: checked with the point oracle, plus an exact boundary check
+  for xor (`RegionComparator::xorBoundariesConsistent`: the boundary of A xor B is the
+  union of both boundaries). `$fail` is initialized before them. The vertex count is
+  now only printed.
+- `GeometryOracle::countWrong()` only measures edge distances for points that
+  disagree, which makes the oracle cheap on polygons with thousands of vertices.
+
+**Verification done.**
+
+- All 116 E2E cases still pass with the strict comparison (11 incomplete, as before),
+  so the weak comparison wasn't hiding further failures.
+- With the `Point.php` from before item 1, `very-small-polygon::union` now **fails**
+  ("region is empty"), where it used to pass.
+- Injected errors in the library output:
+
+  | Injected error | Old harness | New harness |
+  |---|---|---|
+  | One vertex moved 1e-7 | 8 of 105 caught | 88 of 105 |
+  | Tiny extra piece far away | 31 of 105 caught | 98 of 105 |
+
+  The remaining cases have empty results, so there's nothing to inject into.
+- A missing ring (an island) in the continent xor: `tests.php` now FAILs for both
+  Australia and Europe and exits with 1. The point oracle alone missed it.
+- `RegionComparatorTest`: 8 tests of the comparator itself.
+- Cost: `tests.php` 0.65 s → 1.3 s, because of the continent checks.
 
 ### 5. `Polygon::create()` leaves `isInverted` uninitialized
 
