@@ -179,16 +179,27 @@ añadan regiones enteras. Para evitarlo, antes de operar se **normalizan** las e
 aristas que pasan a menos de la tolerancia de un vértice se parten en ese vértice.
 Ninguna coordenada se mueve más que la tolerancia.
 
+Siempre se normaliza al menos con la tolerancia aritmética de la librería
+(`Algorithm::TOLERANCE`, 1e-12): los puntos que la librería considera iguales pasan a
+ser idénticos. Esto no depende de los datos, y evita que resultados encadenados (como
+las capas de cobertura doble, triple... de un cálculo de coberturas, cuyos vértices
+salen de operaciones distintas y difieren en unos pocos ulps) produzcan resultados
+erróneos. Ver ISSUES.md #11. Encima se aplica la precisión de los datos:
+
 | `$precision` | Comportamiento |
 |---|---|
-| `null` (por defecto) | Automático: si todas las coordenadas tienen como mucho entre 5 y 9 decimales, la tolerancia es ese cuanto (1e-7 con 7 decimales). Con enteros o con precisión completa no se normaliza. |
-| `0.0` | Sin normalización (comportamiento anterior). |
-| `> 0` | Tolerancia explícita, en unidades de las coordenadas (p.ej. `1e-7`). Útil con datos de precisión mezclada o en coordenadas no geográficas. |
+| `null` (por defecto) | Tolerancia aritmética y, si todas las coordenadas tienen como mucho entre 5 y 9 decimales, ese cuanto (1e-7 con 7 decimales). Con enteros o con precisión completa (resultados de otras operaciones) solo la aritmética. |
+| `> 0` | Tolerancia explícita en unidades de las coordenadas (p.ej. `1e-7`), nunca menor que la aritmética. Útil con datos de precisión mezclada o en coordenadas no geográficas. |
+| `0.0` | Sin ninguna normalización (comportamiento anterior a ISSUES.md #2 y #11). |
 
 No sirve fijar una tolerancia más fina que la precisión de los datos (p.ej. 1 mm con
 datos de 7 decimales): el redondeo desplaza los vértices hasta ~8 mm y no se corregiría.
 Redondear las entradas a una rejilla tampoco: es precisamente lo que crea el problema.
-La normalización cuesta entre un 3 % y un 9 % del tiempo cuando actúa. Ver ISSUES.md #2.
+La normalización cuesta entre un 2 % y un 9 % del tiempo. Ver ISSUES.md #2 y #11.
+
+La librería está pensada para coordenadas lon/lat (o de magnitud parecida). Con
+coordenadas proyectadas en metros (UTM, Web Mercator) la tolerancia de 1e-12 queda
+por debajo de la resolución de un double y hay operaciones que fallan; ver ISSUES.md #8.
 
 La API de bajo nivel (`segments()`, `combine()`, `polygon()`...) no normaliza.
 
@@ -380,6 +391,16 @@ Known issues and their status are tracked in [`ISSUES.md`](./ISSUES.md). To see
 which ones are already fixed:
 
 - ./vendor/bin/phpunit --testsuite issues --testdox --colors=never
+
+Stress suite: 32 radar-coverage scenarios (8 and 9 radars within 300 km, 720-vertex
+irregular coverages, exact coverage layers 0..N computed two independent ways and
+checked without using the library). It takes ~1-3 minutes per scenario, so it is not
+part of the default suite; CI runs it on every merge to `main`
+(`.github/workflows/stress.yml`, 8 parallel shards on PHP 8.3 and 8.5), and it can be
+run by hand from the Actions tab on any branch. Locally:
+
+- ./vendor/bin/phpunit --testsuite stress
+- STRESS_SHARDS=4 STRESS_SHARD=0 ./vendor/bin/phpunit --testsuite stress   (shard 1 of 4)
 
 ## Tutorials and notes
 

@@ -45,9 +45,11 @@ at a time. Tick the box when an item is done.
 | [5](#5-polygoncreate-leaves-isinverted-uninitialized) | `Polygon::create()` leaves `isInverted` uninitialized | Low | Open |
 | [6](#6-many-with-a-single-polygon-return-the-raw-input) | `*Many()` with a single polygon return the raw input | Low | Open |
 | [7](#7-gjtools-rejects-the-whole-input-when-one-ring-is-degenerate) | GJTools rejects the whole input when one ring is degenerate | Low | Open, decision needed |
-| [8](#8-pointkey-overflows-and-projected-coordinates-are-not-supported) | `pointKey()` overflow / projected coordinates | Low (lon/lat) | Open |
+| [8](#8-pointkey-overflows-and-projected-coordinates-are-not-supported) | `pointKey()` overflow / projected coordinates | Low (lon/lat) | Documented limitation; fix plan tested |
 | [9](#9-remaining-phpstan-findings) | Remaining PHPStan findings | Low | Open |
 | [10](#10-repository-and-ci-hygiene) | Repository and CI hygiene | Low | Mostly fixed; README table pending |
+| [11](#11-chained-results-whose-vertices-differ-in-a-few-ulps) | Chained results whose vertices differ in a few ulps | High | Fixed (this branch) |
+| [12](#12-robust-core-snap-rounding) | Robust core (snap rounding) | — | Open, long term |
 | [L](#known-limitations-accepted) | Known limitations (accepted) | — | Documented |
 
 ---
@@ -476,7 +478,9 @@ the 8 fixtures should leave `KNOWN_DEVIATIONS`.
 only `fillFromArray()` sets it. Using `Polygon::create()` directly as an operand
 throws `Error: Typed property ...::$isInverted must not be accessed before initialization`.
 
-**Repro.** `Algorithm::union(Polygon::create(), $p)`.
+**Repro.** `Algorithm::segments(Polygon::create())`. Since item 11, the public operations
+normalize (and rebuild) their operands, so `Algorithm::union(Polygon::create(), $p)` no
+longer fails; the low-level API still does. The progress check tests both.
 
 **Proposed fix.** `public bool $isInverted = false;` in
 `src/Ifsnop/MartinezRueda/Polygon.php`, or set it in `__construct()` (line 53).
@@ -525,28 +529,43 @@ often contains collapsed slivers.
 
 ### 8. `pointKey()` overflows, and projected coordinates are not supported
 
-- [ ] Open.
+- [ ] Documented limitation. Fix plan tested, not applied (not needed for lon/lat).
 
-**Severity:** Low for lon/lat, High for projected data (UTM, Web Mercator).
+**Severity:** None for lon/lat (the library's intended use). High for projected data
+(UTM, Web Mercator).
 
-**Problem.**
+**Problem.** The length tolerance `TOLERANCE = 1e-12` is absolute. With coordinates in
+metres at 4.5e6 (UTM), a double only distinguishes steps of ~9e-10 m, so comparing with
+1e-12 is effectively exact. Points that should coincide stay 1 ulp apart and the sweep
+contradicts itself: the same mechanism as item 1, caused by coordinate magnitude instead
+of feature size. Separately, `Algorithm::pointKey()` computes `(int)round(x * 1e12)`,
+which overflows int64 for |x| > 9.2e6 (deprecated in PHP 8.5). With lon/lat neither can
+happen: |x| ≤ 180, and 180 × 1e12 is far below the int64 limit.
 
-- `Algorithm::pointKey()` (`Algorithm.php:14`) computes `(int)round(x * 1e12)`.
-  That exceeds the 64-bit integer range for |x| > 9.2e6 and wraps around, giving
-  meaningless keys for the chainer. For example, `(int)round(2e7*1e12)` is
-  `1553255926290448384`. Lon/lat never gets there (180 × 1e12 = 1.8e14).
-- More generally, a length tolerance of 1e-12 is below the float precision of
-  projected coordinates in metres (spacing ≈ 1e-9 at 4.5e6). Fuzzing at UTM-like
-  magnitudes (5e5–2e7) gave about 7% wrong results on near-coincident edges.
+**Measured** (branch with items 1, 2, 4 fixed; 240 operations per row):
 
-**Proposed fix.** Key with `sprintf('%.0f', round($x * TOLERANCE_INV))` (no
-integer cast), or with a coarser grid. For projected data, use a tolerance
-floored by magnitude, such as `max(1e-12, 64 × PHP_FLOAT_EPSILON × max|coord|)`.
-Only needed if projected coordinates must be supported; otherwise document that
-the library expects lon/lat degrees.
+| Data | Failures now | With the plan below |
+|---|---|---|
+| UTM north (~4.5e6 m), 1 km parcels | 27 | 0 |
+| UTM north, rounded to cm (2 decimals) | 11 | 0 (6 without step 3) |
+| UTM south (~9.5e6 m) | 28 | 0 |
+| Web Mercator (~2e7 m) | 34 | 0 |
+| Tiles and single polygons in UTM | 0 | 0 |
 
-**Verify.** Add a placement such as `[4500000, 1000]` to
-`RandomizedClippingTest::PLACEMENTS` (expected to fail today).
+**Fix plan** (tested in a scratch copy, not applied):
+
+1. Arithmetic tolerance floor, set when each public operation starts:
+   `max(1e-12, 16 · PHP_FLOAT_EPSILON · max|coord|)`. It's used in the length
+   comparisons of `Point` and in `pointKey()`. For lon/lat it stays exactly 1e-12; at
+   4.5e6 m it is 1.6e-8 m. This doesn't depend on the data's decimals.
+2. `pointKey()` without the int cast: quantize with the effective tolerance and format
+   with `sprintf('%.0f')`.
+3. Extend precision detection to projected data: |coord| > 1e4 with 1–4 decimals.
+
+Cost: +3–5% (Europe xor). Risk: the tolerance becomes per-operation state (it must be
+restored after each operation; the low-level API would keep using 1e-12).
+
+**Workaround meanwhile:** use lon/lat, or translate projected data to a local origin.
 
 ### 9. Remaining PHPStan findings
 
@@ -602,6 +621,80 @@ Also consider running PHPStan in CI (see [10](#10-repository-and-ci-hygiene)).
   `Algorithm::differenceRev`) and described `TOLERANCE`/`TOLERANCE_SQRT` wrongly
   ("≈ 1 mm", "for squared values"). Fixed together with item 2; the API section now
   lists the real methods, including the `*Many` ones.
+
+### 11. Chained results whose vertices differ in a few ulps
+
+- [x] Fixed on this branch.
+
+**Severity:** High. It affects the library's main use case: chained operations such as
+radar coverage layers.
+
+**How it was found.** The stress suite (`tests/stress`, radar coverage with 8 radars)
+found one scenario out of 32 (8 radars, seed 2, inputs rounded to 7 decimals). There,
+the incremental method assigned ~3 km² that don't exist, and the layers didn't add up
+to the box. The point oracle didn't see it; the exact checks did. It also failed on
+`main`.
+
+**Minimal case** (reduced from that scenario): the union of a triangle and a
+quadrilateral **returned an empty result**.
+
+- Two vertices that should be the same point differ by 2.8e-14° (~4 ulps).
+- A vertex lies 7.7e-15° from the other polygon's edge.
+
+This is what chained operations produce: the same edge or vertex computed in two
+different operations. It's machine rounding, not data precision. polybooljs (the
+origin of this port), polygon-clipping, martinez and Clipper all handle the case
+correctly, so this was a regression introduced during the port.
+
+**Cause.** The predicates (tolerance 1e-12) say the two vertices are the same point and
+that the vertex is on the edge, but the coordinates are still different. The sweep uses
+both and contradicts itself.
+
+**Fix.** Every public operation now normalizes its inputs (`InputNormalizer`) with at
+least the arithmetic tolerance, `max(TOLERANCE, data precision)`. Points the predicates
+consider equal become identical, and an edge passing within `TOLERANCE` of a vertex is
+split at it. This doesn't depend on the data's decimals. `precision: 0.0` disables all
+normalization.
+
+**Verification done.**
+
+- The minimal case is now correct (`RadarCoverageTest`; it fails with the old code).
+- All 48 radar scenarios run so far are exact: 32 of 8 radars (16 on `main` and 16 on
+  this branch, before the fix) plus 16 with the fix. That includes the failing one,
+  whose partition error is now 2.1e-15.
+- Full stress suite run locally with the fix: **32 of 32 scenarios pass**.
+  - 16 scenarios of 8 radars: 361–626 rings and ~13,000 vertices per scenario.
+  - 16 scenarios of 9 radars: 451–701 rings and 14,500–15,600 vertices; the long-range
+    ones have areas covered by all 9 radars.
+  - Runtime: 23 min in 4 parallel shards (60–175 s per scenario).
+  - With the old `Algorithm.php`, the stress scenario "8 radars, seed 2, 7 decimals"
+    fails (layer 4 differs between the two methods; partition error 4.3e-6).
+- `tests.php` and PHPUnit pass. Cost: +2–6% (radar scenario 45.5 → 46.5 s; Europe xor
+  0.516 → 0.545 s).
+
+**Limitation.** It only acts on the inputs of each operation. A near-degenerate
+configuration created inside a sweep (from crossings computed during that same
+operation) could still fail; none has appeared in the tests. The long-term solution is
+item 12.
+
+### 12. Robust core (snap rounding)
+
+- [ ] Open, long term.
+
+**Problem.** The sweep decides with epsilon tolerances in its predicates. With
+near-degenerate input this can lead to contradictory decisions (items 2 and 11). The
+input normalization avoids those configurations instead of making the sweep robust to
+them.
+
+**Reference.** Clipper (integer coordinates, crossings rounded to the grid) and JTS
+(snapping noder with snap-rounding fallback) gave 0 errors on every case tested,
+without knowing anything about the data. The literature remedy is snap rounding
+(Greene; Hobby 1999; Halperin & Packer's iterated snap rounding).
+
+**Proposal.** Round computed crossings consistently to a grid at the arithmetic
+precision (hot pixels), instead of deciding with tolerances. That would make the
+data-precision heuristic of item 2 unnecessary. It's a large change to the crossing
+computation and splitting, and should be done with the stress suite as its safety net.
 
 ---
 
