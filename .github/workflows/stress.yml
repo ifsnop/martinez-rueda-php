@@ -1,0 +1,55 @@
+name: Stress tests (radar coverage)
+
+# Suite de estrés: 32 escenarios de coberturas radar (8 y 9 radares, bordes irregulares,
+# precisión completa / 7 decimales / alcance largo). Ver tests/stress y tests/Support/RadarCoverage.php.
+# Tarda demasiado para cada push de un PR (~1-3 min por escenario), así que se ejecuta:
+#   - en cada merge (push) a main,
+#   - a mano desde la pestaña Actions ("Run workflow"), en cualquier rama.
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stress:
+    name: stress (PHP ${{ matrix.php }}, trozo ${{ matrix.shard }}/8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [ '8.3', '8.5' ]
+        shard: [ 0, 1, 2, 3, 4, 5, 6, 7 ]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up PHP ${{ matrix.php }}
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php }}
+        extensions: dom, mbstring, xmlwriter
+        coverage: none
+        tools: composer
+
+    - name: Cache Composer packages
+      uses: actions/cache@v3
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php${{ matrix.php }}-
+
+    - name: Install dependencies
+      run: composer install --prefer-dist --no-progress
+
+    - name: Run stress shard ${{ matrix.shard }} of 8
+      env:
+        STRESS_SHARDS: 8
+        STRESS_SHARD: ${{ matrix.shard }}
+      run: php -d memory_limit=1G vendor/bin/phpunit --testsuite stress --do-not-cache-result

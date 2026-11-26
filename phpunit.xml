@@ -13,10 +13,15 @@
         <testsuite name="Test Suite">
             <directory>tests</directory>
             <exclude>tests/issues</exclude>
+            <exclude>tests/stress</exclude>
         </testsuite>
         <!-- Seguimiento de ISSUES.md (ver tests/issues/IssuesProgressTest.php) -->
         <testsuite name="issues">
             <directory>tests/issues</directory>
+        </testsuite>
+        <!-- Estrés: coberturas radar de 8 y 9 radares (ver tests/stress); en cada merge a main -->
+        <testsuite name="stress">
+            <directory>tests/stress</directory>
         </testsuite>
     </testsuites>
     <php>
