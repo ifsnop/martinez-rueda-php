@@ -15,9 +15,10 @@ final class GJTools
      * - Para Feature/FeatureCollection/GeometryCollection: se extraen todos los polígonos contenidos.
      * - Geometrías no poligonales (Point/LineString/etc.) se ignoran.
      *
-     * @param string|array|object $geojsonSource Ruta a archivo .geojson, JSON en string o estructura ya decodificada.
+     * @param mixed $geojsonSource Ruta a archivo .geojson, JSON en string o estructura ya decodificada (array/objeto).
      * @return array Array de polígonos: [ [ [ [x,y], ... ], [holeRing], ... ], ... ]
      * @throws \InvalidArgumentException Si el JSON no es válido o el objeto no es GeoJSON válido.
+     * @api API pública
      */
     public static function geojsonToArray($geojsonSource): array
     {
@@ -37,8 +38,10 @@ final class GJTools
                 throw new \InvalidArgumentException("JSON inválido: " . json_last_error_msg());
             }
         } elseif (is_array($geojsonSource) || is_object($geojsonSource)) {
-            // convertir objeto stdClass a array asociativo recursivamente
-            $root = json_decode(json_encode($geojsonSource), true);
+            // convertir objetos stdClass a arrays asociativos recursivamente. No se hace con
+            // json_decode(json_encode(...)): json_encode falla con NaN/INF y devolvía false
+            // (TypeError en json_decode). Las coordenadas no finitas se descartan más abajo.
+            $root = self::toPlainArray($geojsonSource);
         } else {
             throw new \InvalidArgumentException("Tipo de entrada no soportado.");
         }
@@ -186,8 +189,8 @@ final class GJTools
                 $x = $pt[0];
                 $y = $pt[1];
 
-                // Validar numéricos
-                if (!is_numeric($x) || !is_numeric($y)) {
+                // Validar numéricos y finitos (NaN/INF se descartan como cualquier coordenada inválida)
+                if (!is_numeric($x) || !is_numeric($y) || !is_finite((float)$x) || !is_finite((float)$y)) {
                     continue;
                 }
 
@@ -232,6 +235,20 @@ final class GJTools
         return $rings;
     }
 
+    /** Convierte recursivamente objetos (stdClass) en arrays asociativos, sin pasar por JSON. */
+    private static function toPlainArray(mixed $value): mixed
+    {
+        if (is_object($value)) {
+            $value = get_object_vars($value);
+        }
+        if (is_array($value)) {
+            foreach ($value as $k => $v) {
+                $value[$k] = self::toPlainArray($v);
+            }
+        }
+        return $value;
+    }
+
     /**
      * Asegura que el anillo esté cerrado (primer punto == último).
      * @param array $ring
@@ -239,7 +256,7 @@ final class GJTools
      */
     private static function closeRing(array $ring): array
     {
-        if (!is_array($ring) || count($ring) < 3) {
+        if (count($ring) < 3) {
             throw new \InvalidArgumentException("Anillo inválido: " . json_encode($ring), 101);
         }
         $first = $ring[0];
@@ -420,7 +437,7 @@ final class GJTools
         if ($precision !== null) {
            $ring = self::roundRing($ring, $precision);
     }
-        return json_encode($ring, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return json_encode($ring, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 
     /** Clave de polígono: exterior + '|' + claves de huecos */
@@ -470,9 +487,6 @@ final class GJTools
         if ($coords === null && json_last_error() !== JSON_ERROR_NONE) {
             throw new \InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
         }
-        if (!is_array($coords)) {
-            throw new \InvalidArgumentException("coordinates debe decodificar a un array.");
-        }
         if (empty($coords)) {
             throw new \InvalidArgumentException("coordinates no puede estar vacío.");
         }
@@ -503,9 +517,6 @@ final class GJTools
         //if ($coords === null && json_last_error() !== JSON_ERROR_NONE) {
         //    throw new \InvalidArgumentException("JSON inválido en coordinates: " . json_last_error_msg());
         //}
-        if (!is_array($coords)) {
-            throw new \InvalidArgumentException("coordinates debe decodificar a un array.");
-        }
         if (empty($coords)) {
             throw new \InvalidArgumentException("coordinates no puede estar vacío.");
         }
@@ -526,7 +537,7 @@ final class GJTools
     /** Heurística: ¿parece array de rings (cada uno array de positions)? */
     private static function isPolygonCoordinates(array $coords): bool
     {
-        if (!is_array($coords) || empty($coords)) return false;
+        if (empty($coords)) return false;
         // Debe haber al menos un ring que contenga alguna posición [x,y]
         foreach ($coords as $ring) {
             if (is_array($ring) && !empty($ring)) {
@@ -544,7 +555,7 @@ final class GJTools
     /** Heurística: ¿parece array de polígonos, cada uno con rings que contienen positions? */
     private static function isMultiPolygonCoordinates(array $coords): bool
     {
-        if (!is_array($coords) || empty($coords)) return false;
+        if (empty($coords)) return false;
         foreach ($coords as $poly) {
             if (!is_array($poly) || empty($poly)) continue;
             foreach ($poly as $ring) {
@@ -563,7 +574,7 @@ final class GJTools
     /** Devuelve true si $arr tiene pinta de posición [x,y(,z...)] */
     private static function looksLikePosition(array $arr): bool
     {
-        if (!is_array($arr) || count($arr) < 2) return false;
+        if (count($arr) < 2) return false;
         // Los dos primeros deben ser numéricos
         return is_numeric($arr[0]) && is_numeric($arr[1]);
     }
@@ -572,8 +583,9 @@ final class GJTools
      * Construye un objeto GeoJSON de geometría a partir de la cadena de coordinates,
      * infiriendo automáticamente si es Polygon o MultiPolygon.
      *
-     * @param string $coordinatesJson
+     * @param string|array $coordinatesJson cadena JSON de coordinates o array ya decodificado
      * @return array GeoJSON geometry: ['type' => 'Polygon'|'MultiPolygon', 'coordinates' => [...]]
+     * @api API pública
      */
     public static function buildGeometryFromCoordinates($coordinatesJson): array
     {
@@ -602,6 +614,7 @@ final class GJTools
      * @param array      $coordsB
      * @param array|null $diff            (salida) detalles del primer desacuerdo encontrado.
      * @return bool
+     * @api API pública
      */
     public static function compareCoordinates(
         array $coordsA,

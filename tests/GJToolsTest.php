@@ -69,6 +69,40 @@ final class GJToolsTest extends TestCase
         $this->assertCount(4, $out); // 3 vértices + cierre
     }
 
+    /** ------------------ coordenadas no finitas (NaN / INF) ------------------ */
+
+    public static function provideNonFinite(): array
+    {
+        return ['NaN' => [NAN], 'INF' => [INF], '-INF' => [-INF]];
+    }
+
+    /**
+     * Antes: TypeError ("json_decode(): Argument #1 must be of type string, false given")
+     * porque la entrada se convertía con json_decode(json_encode(...)) y json_encode falla
+     * con valores no finitos. Ahora se descartan como cualquier coordenada inválida.
+     * @dataProvider provideNonFinite
+     */
+    public function testNonFiniteCoordinatesAreSkipped(float $bad): void
+    {
+        $ring = [[0, 0], [$bad, 0], [1, 0], [1, 1], [0, 1], [0, 0]];
+        $expected = [[[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.0, 0.0]]]];
+        $this->assertSame($expected, GJTools::geojsonToArray(['type' => 'Polygon', 'coordinates' => [$ring]]));
+        $this->assertSame($expected, GJTools::geojsonToArray((object)['type' => 'Polygon', 'coordinates' => [$ring]]));
+    }
+
+    public function testRingLeftWithoutEnoughFinitePointsIsDegenerate(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        GJTools::geojsonToArray(['type' => 'Polygon', 'coordinates' => [[[0, 0], [NAN, 0], [NAN, 1], [0, 0]]]]);
+    }
+
+    public function testNestedObjectsAreConvertedWithoutJson(): void
+    {
+        $gj = (object)['type' => 'Feature', 'geometry' => (object)['type' => 'Polygon',
+            'coordinates' => [[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]]]];
+        $this->assertCount(1, GJTools::geojsonToArray($gj));
+    }
+
     public function testSimplePolygon(): void
     {
         $gj = [
