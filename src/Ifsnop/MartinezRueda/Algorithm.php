@@ -13,7 +13,6 @@ final class Algorithm
     // coma flotante de los puntos de cruce calculados; los desplazamientos reales de datos
     // redondeados los corrige la normalización de entradas (InputNormalizer, ISSUES.md #2).
     public const TOLERANCE_SQRT = 1e-6;
-    public const DEBUG = false;
     public const TOLERANCE_INV = 1.0 / Algorithm::TOLERANCE;
 
     private static function pointKey(Point $p): string
@@ -168,6 +167,7 @@ final class Algorithm
     private static function segmentChainer(array $segments): array
     {
         $regions   = [];
+        /** @var array<int, list<Point>> $chains crecen por referencia (PHPStan no sigue las referencias) */
         $chains    = [];   // id => Point[]
         $headIndex = [];   // pointKey => chain id
         $tailIndex = [];   // pointKey => chain id
@@ -334,6 +334,7 @@ final class Algorithm
     }
 
     // core API
+    /** @api API pública */
     public static function segments(Polygon $polygon): PolySegments
     {
         $regionIntersecter = new RegionIntersecter();
@@ -347,7 +348,8 @@ final class Algorithm
         return self::makePolySegments($segments, $polygon->isInverted);
     }
 
-        public static function combine(PolySegments $segments1, PolySegments $segments2): array
+    /** @api API pública */
+    public static function combine(PolySegments $segments1, PolySegments $segments2): array
     {
         $si = new Intersecter(false);
         foreach ($segments1->segments as $seg) {
@@ -551,6 +553,7 @@ final class Algorithm
         return $result;
     }
 
+    /** @api API pública */
     public static function polygon(PolySegments $segments): Polygon
     {
         // 1) Construye cadenas (como ya haces)
@@ -661,6 +664,7 @@ final class Algorithm
 
     // ── Operaciones binarias (dos polígonos) ──────────────────────────────────
 
+    /** @api API pública */
     public static function union(Polygon $polygon1, Polygon $polygon2, ?float $precision = null): Polygon
     {
         [$polygon1, $polygon2] = self::normalizeInputs([$polygon1, $polygon2], $precision);
@@ -669,6 +673,7 @@ final class Algorithm
         );
     }
 
+    /** @api API pública */
     public static function intersect(Polygon $polygon1, Polygon $polygon2, ?float $precision = null): Polygon
     {
         [$polygon1, $polygon2] = self::normalizeInputs([$polygon1, $polygon2], $precision);
@@ -677,6 +682,7 @@ final class Algorithm
         );
     }
 
+    /** @api API pública */
     public static function difference(Polygon $polygon1, Polygon $polygon2, ?float $precision = null): Polygon
     {
         [$polygon1, $polygon2] = self::normalizeInputs([$polygon1, $polygon2], $precision);
@@ -685,6 +691,7 @@ final class Algorithm
         );
     }
 
+    /** @api API pública */
     public static function xoring(Polygon $polygon1, Polygon $polygon2, ?float $precision = null): Polygon
     {
         [$polygon1, $polygon2] = self::normalizeInputs([$polygon1, $polygon2], $precision);
@@ -695,6 +702,7 @@ final class Algorithm
 
     // ── Operaciones n-arias (array de polígonos) ──────────────────────────────
 
+    /** @api API pública */
     public static function unionMany(array $polygons, ?float $precision = null): Polygon
     {
         $n = count($polygons);
@@ -715,6 +723,7 @@ final class Algorithm
         return self::polygon($result);
     }
 
+    /** @api API pública */
     public static function intersectMany(array $polygons, ?float $precision = null): Polygon
     {
         $n = count($polygons);
@@ -734,6 +743,7 @@ final class Algorithm
         return self::polygon($result);
     }
 
+    /** @api API pública */
     public static function xorMany(array $polygons, ?float $precision = null): Polygon
     {
         $n = count($polygons);
@@ -753,6 +763,7 @@ final class Algorithm
         return self::polygon($result);
     }
 
+    /** @api API pública */
     public static function differenceMany(array $polygons, ?float $precision = null): Polygon
     {
         // Nota importante para differenceMany: polygonsToSegments no debe usarse aquí porque
@@ -813,6 +824,7 @@ final class Algorithm
         return $result;
     }
 
+    /** @api API pública */
     public static function selectUnion(array $combined, bool $inv1, bool $inv2): PolySegments
     {
         return self::makePolySegments(
@@ -820,6 +832,7 @@ final class Algorithm
             $inv1 || $inv2
         );
     }
+    /** @api API pública */
     public static function selectIntersect(array $combined, bool $inv1, bool $inv2): PolySegments
     {
         return self::makePolySegments(
@@ -827,6 +840,7 @@ final class Algorithm
             $inv1 && $inv2
         );
     }
+    /** @api API pública */
     public static function selectDifference(array $combined, bool $inv1, bool $inv2): PolySegments
     {
         return self::makePolySegments(
@@ -834,6 +848,7 @@ final class Algorithm
             $inv1 && !$inv2
         );
     }
+    /** @api API pública */
     public static function selectXor(array $combined, bool $inv1, bool $inv2): PolySegments
     {
         return self::makePolySegments(

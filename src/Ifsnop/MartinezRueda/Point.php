@@ -203,6 +203,7 @@ final class Point
      * Devuelve una representación simple del punto como cadena (sin corchetes).
      * Ejemplo: 1.5,3.2
      */
+    /** @api utilidad de depuración pública */
     public function __repr(): string
     {
         return "{$this->x},{$this->y}";

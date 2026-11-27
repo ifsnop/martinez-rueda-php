@@ -36,6 +36,7 @@ final class Polygon
 		return $arr_regions;
 	}
 
+	/** @api API pública */
 	public function getArrayClosed(): array
 	{
 		$arr_regions = [];
