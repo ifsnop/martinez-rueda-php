@@ -123,12 +123,14 @@ Utilidades para importar y normalizar GeoJSON:
 
 ```
 Algorithm::union($polyA, $polyB)
-    └─► __operate($polyA, $polyB, Selector::Union)
-            ├─► segments($polyA)  → PolySegments $a
-            ├─► segments($polyB)  → PolySegments $b
-            ├─► combine($a, $b)   → CombinedPolySegments
-            ├─► selectUnion(...)  → PolySegments (segmentos filtrados)
-            └─► polygon(...)      → Polygon resultado
+    ├─► normalizeInputs([$polyA, $polyB])  → Polygon[] (InputNormalizer, ver "Precisión de los datos")
+    ├─► segments($polyA)                   → PolySegments $a
+    ├─► segments($polyB)                   → PolySegments $b
+    ├─► unionSegments($a, $b)
+    │       ├─► (bounding boxes disjuntas) concatenar segmentos de frontera
+    │       └─► combine($a, $b)            → Segment[] (con otherFill)
+    │           └─► selectUnion(...)       → PolySegments (segmentos filtrados)
+    └─► polygon(...)                       → Polygon resultado
 ```
 
 ### Barrido de línea (Intersecter)
@@ -208,10 +210,13 @@ La API de bajo nivel (`segments()`, `combine()`, `polygon()`...) no normaliza.
 ```php
 $segs1 = Algorithm::segments($polygon1);         // Fase 1
 $segs2 = Algorithm::segments($polygon2);
-$combined = Algorithm::combine($segs1, $segs2);  // Fase 2
-$selected = Algorithm::selectUnion($combined);   // Selección lógica
+$combined = Algorithm::combine($segs1, $segs2);  // Fase 2: Segment[]
+$selected = Algorithm::selectUnion($combined, $segs1->isInverted, $segs2->isInverted); // Selección lógica
 $result   = Algorithm::polygon($selected);       // Fase 3
 ```
+
+La API de bajo nivel no normaliza las entradas (ver "Precisión de los datos"). Los
+ejemplos de esta sección y del ejemplo 5 se ejecutan en `tests/ReadmeExamplesTest.php`.
 
 ### Importación GeoJSON
 
@@ -299,8 +304,9 @@ $segsA = Algorithm::segments($polyA);
 $segsB = Algorithm::segments($polyB);
 
 // Probar varias operaciones sin re-procesar los polígonos originales
-$union  = Algorithm::polygon(Algorithm::selectUnion(Algorithm::combine($segsA, $segsB)));
-$inter  = Algorithm::polygon(Algorithm::selectIntersect(Algorithm::combine($segsA, $segsB)));
+$combined = Algorithm::combine($segsA, $segsB);
+$union = Algorithm::polygon(Algorithm::selectUnion($combined, $segsA->isInverted, $segsB->isInverted));
+$inter = Algorithm::polygon(Algorithm::selectIntersect($combined, $segsA->isInverted, $segsB->isInverted));
 ```
 
 ---
