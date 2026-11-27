@@ -53,11 +53,9 @@ jobs:
     - name: Custom tests
       run: php tests.php
 
-    # No bloqueante mientras queden errores de PHPStan (ISSUES.md, punto 9).
-    # Cuando el análisis quede limpio, quitar "continue-on-error".
+    # Obligatorio: cualquier aviso nuevo de PHPStan hace fallar el build (ISSUES.md, punto 9).
     - name: PHPStan
       run: vendor/bin/phpstan analyse --no-progress --error-format=github
-      continue-on-error: true
 
     # Add a test script to composer.json, for instance: "test": "vendor/bin/phpunit"
     # Docs: https://getcomposer.org/doc/articles/scripts.md

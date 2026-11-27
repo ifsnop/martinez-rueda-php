@@ -46,7 +46,7 @@ at a time. Tick the box when an item is done.
 | [6](#6-many-with-a-single-polygon-return-the-raw-input) | `*Many()` with a single polygon return the raw input | Low | Open |
 | [7](#7-gjtools-rejects-the-whole-input-when-one-ring-is-degenerate) | GJTools rejects the whole input when one ring is degenerate | Low | Open, decision needed |
 | [8](#8-pointkey-overflows-and-projected-coordinates-are-not-supported) | `pointKey()` overflow / projected coordinates | Low (lon/lat) | Documented limitation; fix plan tested |
-| [9](#9-remaining-phpstan-findings) | Remaining PHPStan findings | Low | Open |
+| [9](#9-remaining-phpstan-findings) | Remaining PHPStan findings | Low | Fixed (this branch); PHPStan now blocking in CI |
 | [10](#10-repository-and-ci-hygiene) | Repository and CI hygiene | Low | Mostly fixed; README table pending |
 | [11](#11-chained-results-whose-vertices-differ-in-a-few-ulps) | Chained results whose vertices differ in a few ulps | High | Fixed (this branch) |
 | [12](#12-robust-core-snap-rounding) | Robust core (snap rounding) | — | Open, long term |
@@ -569,19 +569,45 @@ restored after each operation; the low-level API would keep using 1e-12).
 
 ### 9. Remaining PHPStan findings
 
-- [ ] Open.
+- [x] Fixed on this branch: 0 findings at the configured level (5), and the CI step is
+  now blocking, so any new finding fails the build.
 
-`vendor/bin/phpstan analyse` (level 5) now reports 32 findings:
+**The 32 findings, analysed:**
 
-| Finding | Where | Assessment / proposed fix |
-|---|---|---|
-| Conditions always true/false (`$lenC >= 2`, `>= 3`, `< 2`, `if` always false) | `Algorithm.php` segmentChainer, lines 242, 275, 299, 303, 317 | Probably false positives: PHPStan assumes chains always have 2 points because it doesn't follow the by-reference `array_unshift`/`$chain[] =`. **Check manually**; if confirmed, add a precise `@var` type or restructure so the length is tracked explicitly. |
-| `is_object()` / `is_array()` always true (6) | `GJTools.php` 39, 242, 506, 529, 547, 566 | Redundant checks after type declarations. Remove them, or loosen the parameter types if callers really pass mixed values. |
-| `is_array()` on a string is always false | `GJTools::buildGeometryFromCoordinates` (line 578) | The docblock says `@param string` but the method accepts arrays too. Fix the docblock to `string\|array`. |
-| 19 "unused method" and 1 "unused constant" | public API (`union`, `intersect`, `unionMany`, `GJTools::geojsonToArray`, ...) and `Algorithm::DEBUG` | False positives from shipmonk/dead-code-detector: the public API is used by callers outside `src/`. Configure the detector to treat public methods as used (or analyse `tests/` too). Remove `DEBUG` if it's really unused. |
-| Nullable access (level 8 only) | `Intersecter.php` 328–350, `StatusList.php` 79–100 | Possible null `Node`/`Segment`/`StatusEntry`. Check whether these can really be null in the sweep; if not, add asserts or non-null types. |
+| Findings | What they were | Bug? | Fix |
+|---|---|---|---|
+| 5: conditions "always true/false" in `segmentChainer` | PHPStan believed every chain always has 2 points, because chains grow through references (`$chain = &$chains[$i]`, `array_unshift`, by-ref helpers) that it doesn't follow. Instrumented: those branches run thousands of times (`count >= 3`: 11,675; `reverseFirst` true: 933). | No | `@var array<int, list<Point>> $chains`: it documents the real type, it doesn't suppress anything. |
+| 17: public API "unused" | `union`, `intersect`, `*Many`, `segments`/`combine`/`polygon`/`select*`, `geojsonToArray`, `getArrayClosed`... used only by client code and tests, which aren't analysed. | No | `@api` per method (the detector's mechanism; not per class, so real dead code stays visible). |
+| 2: dead code | The `CombinedPolySegments` class (used nowhere) and the constant `Algorithm::DEBUG`. | No | Removed. |
+| 5: redundant `is_array()` in `GJTools` | Checking a parameter already typed `array`. | No | Removed. |
+| 2: wrong docblocks in `GJTools` | `geojsonToArray` accepts any type; `buildGeometryFromCoordinates` also accepts arrays. | No | Docblocks fixed. |
+| 1: `Point::__repr` unused | Public debug helper, covered by a test. | No | `@api`. |
 
-Also consider running PHPStan in CI (see [10](#10-repository-and-ci-hygiene)).
+**Two real bugs found along the way:**
+
+1. **The README's low-level API example didn't work.** It called
+   `selectUnion($combined)` with one argument instead of three
+   (`$combined, $inv1, $inv2`): `ArgumentCountError`. It was wrong in three places (the
+   flow diagram, the "API de bajo nivel" section and example 5). Called correctly, the
+   API gives the same results as the high-level operations. The README is fixed, and
+   `tests/ReadmeExamplesTest.php` now **runs those README code blocks** and compares
+   them with `union` and `intersect`, so the docs can't silently rot again. It fails
+   with the old README.
+2. **`GJTools::geojsonToArray()` with NaN/INF in an array or object input threw
+   `TypeError`** ("json_decode(): Argument #1 must be of type string, false given"),
+   because it converted the input with `json_decode(json_encode(...))` and
+   `json_encode` fails on non-finite values. It now converts recursively without JSON,
+   and non-finite coordinates are skipped like any other invalid coordinate (a ring
+   left with fewer than 3 points is rejected as degenerate). `ringKey()` uses
+   `JSON_THROW_ON_ERROR`. New `GJToolsTest` cases fail with the old code.
+
+**Level 8 (not configured).** About 130 further findings, nearly all "property may be
+`null`" in `Intersecter`, `EventList` and `StatusList`. `Node` and `Segment` declare
+their properties nullable because the lists' sentinel nodes are created empty;
+real nodes always have them (of 3,759 segments reaching `boundaryOnly` across all
+suites, none had a null `myFill`). The only real ones were the two `GJTools` cases
+above. Cleaning level 8 would need a redesign of those types (non-null sentinel
+objects); not worth it now. The configured level stays at 5.
 
 ### 10. Repository and CI hygiene
 
@@ -601,7 +627,7 @@ Also consider running PHPStan in CI (see [10](#10-repository-and-ci-hygiene)).
   | 3 | `removeColinearPointsFromPolygon` tolerance | Fixed by [F4](#f4-gjtools-collinear-removal-deleted-the-wrong-vertex) |
   | 4 | `__splitRegionAtDuplicates` O(n²) recursive | Still present (`Algorithm.php:586`); not measured |
   | 5 | `combine()` return type | Done (`: array`) |
-  | 6 | `__operate` / `CombinedPolySegments` | `__operate` is gone; the `CombinedPolySegments` class is now unused, so delete it |
+  | 6 | `__operate` / `CombinedPolySegments` | Done: `__operate` is gone and `CombinedPolySegments` was deleted (item 9) |
   | 7 | `intersectionMany`, `differenceMany`, `xorMany` | Done |
   | 8 | `buildGeometryFromCoordinates` | Accepts arrays now; docblock still wrong (see [9](#9-remaining-phpstan-findings)) |
 
