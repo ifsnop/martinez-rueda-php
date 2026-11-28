@@ -5,11 +5,39 @@ ini_set("display_errors", 1);
 
 use PHPUnit\Framework\TestCase;
 use Ifsnop\MartinezRueda as MR;
+use Ifsnop\MartinezRueda\Tests\Support\RegionComparator;
 
 include_once('autoloader.php');
 
 final class PolygonClippingE2ETest extends TestCase
 {
+    /**
+     * Casos de polygon-clipping (una sola geometría) cuyo resultado esperado no
+     * coincide con el de esta librería por motivos conocidos. Se ejecutan igual
+     * (una excepción de la librería sigue siendo un error), pero si el resultado
+     * difiere se marcan como "incomplete" en lugar de fallar. Si algún día
+     * coinciden, el test pasa normalmente y conviene quitar la entrada.
+     */
+    private const EVEN_ODD = 'la entrada es un MultiPolygon cuyas partes se solapan; esta librería '
+        . 'aplica la regla par-impar (el solape se cancela) y polygon-clipping las une. '
+        . 'El resultado coincide con la interpretación par-impar de la entrada.';
+    private const SUB_TOLERANCE = 'polígono más estrecho que Algorithm::TOLERANCE (1e-12, por debajo de la '
+        . 'precisión de float en esas coordenadas): la librería lo descarta como degenerado y polygon-clipping '
+        . 'lo conserva. Limitación aceptada (ISSUES.md, "Known limitations").';
+    private const KNOWN_DEVIATIONS = [
+        'issue-61::union'                         => self::EVEN_ODD,
+        'issue-61-2::union'                       => self::EVEN_ODD,
+        'issue-62::union'                         => self::EVEN_ODD,
+        'issue-62-2::union'                       => self::EVEN_ODD,
+        'issue-68::union'                         => self::EVEN_ODD,
+        'parallel-lines-with-crossing::union'     => self::EVEN_ODD,
+        'split-almost-vertical-segment::union'    => self::EVEN_ODD,
+        'union-same-shape-multiple-times::union'  => self::EVEN_ODD,
+        'nearly-vertical-segment::union'          => self::SUB_TOLERANCE,
+        'thin-vertical-triangle::union'           => self::SUB_TOLERANCE,
+        'thin-vertical-triangle-2::union'         => self::SUB_TOLERANCE,
+    ];
+
     // ==========================
     // Parámetros vía entorno
     // ==========================
@@ -43,10 +71,6 @@ final class PolygonClippingE2ETest extends TestCase
         return $m !== false ? max(1, (int)$m) : PHP_INT_MAX;
     }
 
-    private static function almostEqual(float $a, float $b): bool {
-	// print $a . "-" . $b. "=" . ($a-$b) . PHP_EOL;
-        return abs($a-$b) <= 0.1; //MR\Algorithm::TOLERANCE;
-    }
 
     private static function isDebugEnabled(): bool
     {
@@ -54,110 +78,19 @@ final class PolygonClippingE2ETest extends TestCase
     }
 
     /**
-    * Compara dos arrays de coordenadas estilo MultiPolygon haciendo un XOR,
-    * si los dos arrays son iguales, el resultado debería ser conjunto vacio.
-    * No importa si los polígonos están representados de forma distinta (por
-    * ejemplo un polígono con hueco o dos polígonos que dejan el hueco entre
-    * ellos).
-    *
-    * Se usa como alternativa si la comparación normal no funciona, como última
-    * opción.
-    *
-    * @param array      $coordsA
-    * @param array      $coordsB
-    * @param array|null $diff            (salida) detalles del primer desacuerdo encontrado.
-    * @return bool
-    */
-    public static function comparePolygons(
-	array $coordsA,
-	array $coordsB,
-	?array &$diff = null
-    ): bool {
-	$diff = null;
-
-	$res = self::runOp($coordsA, $coordsB, "xor");
-	$diff = MR\GJTools::geojsonToArray($res);
-	return $diff == [];
-    }
-
- /**
-     * Compara dos arrays de coordenadas estilo MultiPolygon (p.ej. salida de ringsToCoordinates):
-     * [ polygon1, polygon2, ... ], cada polygon = [ exterior, hole1, ... ], cada ring = [ [x,y], ... ]
+     * ¿Son iguales dos regiones? Usa un comparador independiente de la librería
+     * (tests/Support/RegionComparator.php, ISSUES.md #4): fronteras a menos de δ en los
+     * dos sentidos y mismo interior en puntos de muestra. Antes se usaba el xor de la
+     * propia librería (un bug en xor escondía bugs en las demás operaciones) y una
+     * comparación de coordenadas con tolerancia 0.1 (11 km en lon/lat).
      *
-     * @param array      $coordsA
-     * @param array      $coordsB
-     * @param array|null $diff            (salida) detalles del primer desacuerdo encontrado.
-     * @return bool
+     * @param array       $coordsA lista de anillos o MultiPolygon
+     * @param array       $coordsB lista de anillos o MultiPolygon
+     * @param string|null $diff    (salida) motivo de la primera diferencia encontrada
      */
-    public static function compareCoordinates(
-        array $coordsA,
-        array $coordsB,
-        ?array &$diff = null
-    ): bool {
-        $diff = null;
-
-        // 1) Nº de polígonos
-        $na = count($coordsA);
-        $nb = count($coordsB);
-        if ($na !== $nb) {
-            $diff = ['where' => 'polygon_count', 'a' => $na, 'b' => $nb];
-	    //print "ABORT1" . PHP_EOL;
-            return false;
-        }
-
-        // 2) Iterar polígonos, anillos y puntos
-        for ($p = 0; $p < $na; $p++) {
-            $polyA = $coordsA[$p];
-            $polyB = $coordsB[$p];
-
-            $ra = count($polyA);
-            $rb = count($polyB);
-            if ($ra !== $rb) {
-                $diff = ['where' => 'ring_count', 'polygon' => $p, 'a' => $ra, 'b' => $rb];
-		// print "ABORT2" . PHP_EOL;
-                return false;
-            }
-
-            for ($r = 0; $r < $ra; $r++) {
-                $ringA = $polyA[$r];
-                $ringB = $polyB[$r];
-
-                $pa = count($ringA);
-                $pb = count($ringB);
-                if ($pa !== $pb) {
-                    $diff = ['where' => 'point_count', 'polygon' => $p, 'ring' => $r, 'a' => $pa, 'b' => $pb];
-		    // print "ABORT3" . PHP_EOL;
-                    return false;
-                }
-
-                // Punto a punto
-                for ($k = 0; $k < $pa; $k++) {
-                    $ax = (float)$ringA[$k][0]; $ay = (float)$ringA[$k][1];
-                    $bx = (float)$ringB[$k][0]; $by = (float)$ringB[$k][1];
-
-                    if (!self::almostEqual($ax, $bx)) {
-                        $diff = [
-                            'where'   => 'point_x',
-                            'polygon' => $p, 'ring' => $r, 'point' => $k,
-                            'a' => $ax, 'b' => $bx
-                        ];
-			// print "ABORT4" . PHP_EOL;
-                        return false;
-                    }
-                    if (!self::almostEqual($ay, $by)) {
-                        $diff = [
-                            'where'   => 'point_y',
-                            'polygon' => $p, 'ring' => $r, 'point' => $k,
-                            'a' => $ay, 'b' => $by
-                        ];
-			// print "ABORT5" . PHP_EOL;
-                        return false;
-                    }
-                }
-            }
-        }
-
-        return true;
+    public static function comparePolygons(array $coordsA, array $coordsB, ?string &$diff = null): bool
+    {
+        return RegionComparator::equal($coordsA, $coordsB, null, $diff);
     }
 
     // ==========================
@@ -352,34 +285,49 @@ final class PolygonClippingE2ETest extends TestCase
 		$input . PHP_EOL;
 	}
 
-        if (count($geoms) < 2) {
+        if (count($geoms) === 0) {
             $this->markTestSkipped("[$label] args sin geometrías: $argsPath");
         }
+
+	// Una sola geometría: se opera contra un polígono vacío, lo que equivale a
+	// "limpiar" la geometría (resolver auto-intersecciones, anillos solapados,
+	// segmentos degenerados...). Así se ejecutan los casos de polygon-clipping
+	// que sólo tienen un argumento (union de una geometría consigo misma).
+	if (count($geoms) === 1) {
+	    $geoms[] = [];
+	}
 
 	$got = self::runOpMulti($geoms, $op);
 
 	if ( self::isDebugEnabled() )
 	    print "got:\t" . json_encode($got) . PHP_EOL;
 
-	$got_normalized = MR\GJTools::geojsonToArray($got);
-	if ( self::isDebugEnabled() )
-	    print "got_n:\t" . json_encode($got_normalized) . PHP_EOL;
+	$knownReason = self::KNOWN_DEVIATIONS[$label] ?? null;
 
-	$exp_normalized = MR\GJTools::geojsonToArray($expectedPath);
+	// El esperado se lee directamente del GeoJSON (sin GJTools, que es parte de la
+	// librería probada) y se compara con la salida en bruto de la librería.
+	$expected = self::geomsFromGeoJSON(self::readGeoJSON($expectedPath));
 	if ( self::isDebugEnabled() )
-	    print "exp:\t" . json_encode($exp_normalized) . PHP_EOL . PHP_EOL;
+	    print "exp:\t" . json_encode($expected) . PHP_EOL . PHP_EOL;
 
-	$diff = [];
+	$diff = null;
+	$equal = self::comparePolygons($got, $expected, $diff);
+
+	if (!$equal && $knownReason !== null) {
+	    $this->markTestIncomplete("[$label] desviación conocida: $knownReason" . PHP_EOL .
+		"diff: " . $diff . PHP_EOL .
+		"got: " . json_encode($got) . PHP_EOL .
+		"expected: " . json_encode($expected));
+	}
 
         $this->assertTrue(
-	    self::compareCoordinates($got_normalized, $exp_normalized, $diff) ||
-	    self::comparePolygons($got_normalized, $exp_normalized, $diff),
+	    $equal,
             "Diferencia detectada" . PHP_EOL .
 	    "input" . PHP_EOL . $input .PHP_EOL .
 	    "operation" . PHP_EOL . "\t" . $op . PHP_EOL .
-            "got" . PHP_EOL . "\t" . json_encode($got_normalized) . PHP_EOL .
-            "expected" . PHP_EOL . "\t" . json_encode($exp_normalized) . PHP_EOL .
-	    "diff" . PHP_EOL . "\t" . json_encode($diff) . PHP_EOL . PHP_EOL
+            "got" . PHP_EOL . "\t" . json_encode($got) . PHP_EOL .
+            "expected" . PHP_EOL . "\t" . json_encode($expected) . PHP_EOL .
+	    "diff" . PHP_EOL . "\t" . $diff . PHP_EOL . PHP_EOL
         );
     }
 }

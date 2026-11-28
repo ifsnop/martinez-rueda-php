@@ -26,7 +26,13 @@ final class Point
 
     /*
      * Comprueba si tres puntos están alineados (colineales) usando determinante.
-     * Se usa una tolerancia para evitar errores por precisión en números flotantes.
+     * La tolerancia es de tipo LONGITUD: el triángulo (p1,p2,p3) se considera
+     * degenerado si su altura mínima (|cross| / lado más largo) es < TOLERANCE.
+     * Así el test no depende de la escala de las coordenadas (antes se comparaba
+     * un área, ~longitud², contra 1e-12, lo que con lados de 1e-5..1e-6 grados
+     * declaraba colineales ángulos de varios grados).
+     * Como "longitud" se usa la suma de normas L1 de los dos lados (sin sqrt ni max()):
+     * >= lado más largo y <= 4 veces él, suficiente para una tolerancia.
      */
     public static function collinear(Point $point1, Point $point2, Point $point3): bool
     {
@@ -35,7 +41,8 @@ final class Point
         $dx2 = $point2->x - $point3->x;
         $dy2 = $point2->y - $point3->y;
 
-        return abs($dx1 * $dy2 - $dx2 * $dy1) < Algorithm::TOLERANCE;
+        $l = abs($dx1) + abs($dy1) + abs($dx2) + abs($dy2); // cota del lado más largo (factor <= 4)
+        return abs($dx1 * $dy2 - $dx2 * $dy1) <= Algorithm::TOLERANCE * $l; // <= : tres puntos idénticos (l=0) son colineales
     }
 
     /*
@@ -76,9 +83,10 @@ final class Point
         $px = $point->x;
         $py = $point->y;
 
-        // Orientación (signo del área): >= -eps ⇒ sobre o por encima
+        // Orientación (signo del área): distancia con signo a la recta >= -eps ⇒ sobre o por encima
+        // (tolerancia de longitud: se escala por la longitud L1 de left→right)
         $orient = (($rx - $lx) * ($py - $ly)) - (($ry - $ly) * ($px - $lx));
-        return $orient >= -Algorithm::TOLERANCE;
+        return $orient >= -Algorithm::TOLERANCE * (abs($rx - $lx) + abs($ry - $ly));
     }
 
     /*
@@ -101,7 +109,7 @@ final class Point
 
         // Colinealidad robusta
         $cross = $abx * $apy - $aby * $apx;
-        $epsGeom = max(1.0, $len) * (1.0 * $eps);
+        $epsGeom = $len * $eps; // distancia de p a la recta ab < eps
         if (abs($cross) > $epsGeom) return false;
 
         $t = ($apx * $abx + $apy * $aby) / $sqlen;
@@ -126,7 +134,9 @@ final class Point
 
         $axb = $adx * $bdy - $ady * $bdx;
 
-        if (abs($axb) < Algorithm::TOLERANCE) {
+        // Paralelas si el giro relativo, medido como desplazamiento, es < TOLERANCE
+        // (|axb| = |a||b|sinθ; se compara contra TOLERANCE * longitud).
+        if (abs($axb) < Algorithm::TOLERANCE * (abs($adx) + abs($ady) + abs($bdx) + abs($bdy))) {
             return null;
         }
 
@@ -193,6 +203,7 @@ final class Point
      * Devuelve una representación simple del punto como cadena (sin corchetes).
      * Ejemplo: 1.5,3.2
      */
+    /** @api utilidad de depuración pública */
     public function __repr(): string
     {
         return "{$this->x},{$this->y}";

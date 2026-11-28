@@ -18,7 +18,7 @@ final class Segment
     public float $maxY;
     public float $len2; // longitud al cuadrado
 
-    public function __construct(Point $start, Point $end, Fill $myFill = null, Fill $otherFill = null)
+    public function __construct(Point $start, Point $end, ?Fill $myFill = null, ?Fill $otherFill = null)
     {
         $this->start = $start;
         $this->end = $end;

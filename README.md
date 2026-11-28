@@ -56,13 +56,14 @@ Clase estática central. Contiene toda la lógica de alto nivel y las operacione
 
 | Constante / Método | Descripción |
 |---|---|
-| `TOLERANCE = 1e-12` | Épsilon para comparaciones geométricas. Equivale aprox. a 1 mm en coordenadas terrestres. |
-| `TOLERANCE_SQRT = 1e-6` | Raíz de TOLERANCE, para comparaciones de valores ya elevados al cuadrado. |
+| `TOLERANCE = 1e-12` | Tolerancia de longitud para comparaciones geométricas (en grados, 1e-12 ≈ 0,1 µm). |
+| `TOLERANCE_SQRT = 1e-6` | Tolerancia adimensional (fracción de la longitud del segmento) con la que el barrido ajusta un cruce a un extremo. Ver ISSUES.md #2. |
 | `segments(Polygon)` | Fase 1: convierte un polígono a `PolySegments`. |
 | `combine(PolySegments, PolySegments)` | Fase 2: combina dos conjuntos de segmentos. |
 | `polygon(PolySegments)` | Fase 3: reconstruye un `Polygon` desde segmentos. |
 | `union / intersect / difference / xor` | Operaciones de alto nivel sobre dos `Polygon`. |
 | `unionMany(array)` | Unión de N polígonos mediante reducción balanceada. |
+| `$precision` (todas las operaciones) | Normalización de entradas redondeadas; ver [Precisión de los datos](#precisión-de-los-datos-precision). |
 | `segmentChainer(array)` | Ensambla segmentos sueltos en anillos cerrados. |
 | `splitSelfTouchingRegions(array)` | Divide anillos que se auto-tocan en ciclos simples. |
 
@@ -122,12 +123,14 @@ Utilidades para importar y normalizar GeoJSON:
 
 ```
 Algorithm::union($polyA, $polyB)
-    └─► __operate($polyA, $polyB, Selector::Union)
-            ├─► segments($polyA)  → PolySegments $a
-            ├─► segments($polyB)  → PolySegments $b
-            ├─► combine($a, $b)   → CombinedPolySegments
-            ├─► selectUnion(...)  → PolySegments (segmentos filtrados)
-            └─► polygon(...)      → Polygon resultado
+    ├─► normalizeInputs([$polyA, $polyB])  → Polygon[] (InputNormalizer, ver "Precisión de los datos")
+    ├─► segments($polyA)                   → PolySegments $a
+    ├─► segments($polyB)                   → PolySegments $b
+    ├─► unionSegments($a, $b)
+    │       ├─► (bounding boxes disjuntas) concatenar segmentos de frontera
+    │       └─► combine($a, $b)            → Segment[] (con otherFill)
+    │           └─► selectUnion(...)       → PolySegments (segmentos filtrados)
+    └─► polygon(...)                       → Polygon resultado
 ```
 
 ### Barrido de línea (Intersecter)
@@ -151,30 +154,69 @@ Usa un índice hash `head → id` y `tail → id` para encadenar segmentos en O(
 
 ```php
 // Todos aceptan dos Polygon y devuelven un Polygon
-Algorithm::union(Polygon $a, Polygon $b): Polygon
-Algorithm::intersect(Polygon $a, Polygon $b): Polygon
-Algorithm::intersection(Polygon $a, Polygon $b): Polygon  // alias de intersect
-Algorithm::difference(Polygon $a, Polygon $b): Polygon    // A \ B
-Algorithm::differenceRev(Polygon $a, Polygon $b): Polygon // B \ A
-Algorithm::xoring(Polygon $a, Polygon $b): Polygon
+Algorithm::union(Polygon $a, Polygon $b, ?float $precision = null): Polygon
+Algorithm::intersect(Polygon $a, Polygon $b, ?float $precision = null): Polygon
+Algorithm::difference(Polygon $a, Polygon $b, ?float $precision = null): Polygon  // A \ B
+Algorithm::xoring(Polygon $a, Polygon $b, ?float $precision = null): Polygon
 ```
 
 ### Operaciones n-arias
 
 ```php
-// Unión de múltiples polígonos (al menos uno requerido)
-Algorithm::unionMany(array $polygons): Polygon
+// Al menos un polígono; con uno solo se devuelve limpio (igual que union(P, vacío))
+Algorithm::unionMany(array $polygons, ?float $precision = null): Polygon
+Algorithm::intersectMany(array $polygons, ?float $precision = null): Polygon
+Algorithm::xorMany(array $polygons, ?float $precision = null): Polygon
+Algorithm::differenceMany(array $polygons, ?float $precision = null): Polygon     // P0 \ P1 \ P2 ...
 ```
+
+### Precisión de los datos (`$precision`)
+
+Cuando las coordenadas vienen **redondeadas** (lo normal en GeoJSON, que suele traer
+7 decimales: ~1 cm), dos polígonos que comparten un borde, o un vértice que estaba
+exactamente sobre la arista vecina, quedan separados por unos milímetros. Esas aristas
+casi coincidentes hacen que el barrido tome decisiones contradictorias y se pierdan o
+añadan regiones enteras. Para evitarlo, antes de operar se **normalizan** las entradas
+(`InputNormalizer`): los vértices a menos de la tolerancia entre sí se unifican, y las
+aristas que pasan a menos de la tolerancia de un vértice se parten en ese vértice.
+Ninguna coordenada se mueve más que la tolerancia.
+
+Siempre se normaliza al menos con la tolerancia aritmética de la librería
+(`Algorithm::TOLERANCE`, 1e-12): los puntos que la librería considera iguales pasan a
+ser idénticos. Esto no depende de los datos, y evita que resultados encadenados (como
+las capas de cobertura doble, triple... de un cálculo de coberturas, cuyos vértices
+salen de operaciones distintas y difieren en unos pocos ulps) produzcan resultados
+erróneos. Ver ISSUES.md #11. Encima se aplica la precisión de los datos:
+
+| `$precision` | Comportamiento |
+|---|---|
+| `null` (por defecto) | Tolerancia aritmética y, si todas las coordenadas tienen como mucho entre 5 y 9 decimales, ese cuanto (1e-7 con 7 decimales). Con enteros o con precisión completa (resultados de otras operaciones) solo la aritmética. |
+| `> 0` | Tolerancia explícita en unidades de las coordenadas (p.ej. `1e-7`), nunca menor que la aritmética. Útil con datos de precisión mezclada o en coordenadas no geográficas. |
+| `0.0` | Sin ninguna normalización (comportamiento anterior a ISSUES.md #2 y #11). |
+
+No sirve fijar una tolerancia más fina que la precisión de los datos (p.ej. 1 mm con
+datos de 7 decimales): el redondeo desplaza los vértices hasta ~8 mm y no se corregiría.
+Redondear las entradas a una rejilla tampoco: es precisamente lo que crea el problema.
+La normalización cuesta entre un 2 % y un 9 % del tiempo. Ver ISSUES.md #2 y #11.
+
+La librería está pensada para coordenadas lon/lat (o de magnitud parecida). Con
+coordenadas proyectadas en metros (UTM, Web Mercator) la tolerancia de 1e-12 queda
+por debajo de la resolución de un double y hay operaciones que fallan; ver ISSUES.md #8.
+
+La API de bajo nivel (`segments()`, `combine()`, `polygon()`...) no normaliza.
 
 ### API de bajo nivel (para pipelines manuales)
 
 ```php
 $segs1 = Algorithm::segments($polygon1);         // Fase 1
 $segs2 = Algorithm::segments($polygon2);
-$combined = Algorithm::combine($segs1, $segs2);  // Fase 2
-$selected = Algorithm::selectUnion($combined);   // Selección lógica
+$combined = Algorithm::combine($segs1, $segs2);  // Fase 2: Segment[]
+$selected = Algorithm::selectUnion($combined, $segs1->isInverted, $segs2->isInverted); // Selección lógica
 $result   = Algorithm::polygon($selected);       // Fase 3
 ```
+
+La API de bajo nivel no normaliza las entradas (ver "Precisión de los datos"). Los
+ejemplos de esta sección y del ejemplo 5 se ejecutan en `tests/ReadmeExamplesTest.php`.
 
 ### Importación GeoJSON
 
@@ -262,8 +304,9 @@ $segsA = Algorithm::segments($polyA);
 $segsB = Algorithm::segments($polyB);
 
 // Probar varias operaciones sin re-procesar los polígonos originales
-$union  = Algorithm::polygon(Algorithm::selectUnion(Algorithm::combine($segsA, $segsB)));
-$inter  = Algorithm::polygon(Algorithm::selectIntersect(Algorithm::combine($segsA, $segsB)));
+$combined = Algorithm::combine($segsA, $segsB);
+$union = Algorithm::polygon(Algorithm::selectUnion($combined, $segsA->isInverted, $segsB->isInverted));
+$inter = Algorithm::polygon(Algorithm::selectIntersect($combined, $segsA->isInverted, $segsB->isInverted));
 ```
 
 ---
@@ -307,7 +350,7 @@ Cada `Node` de evento guarda una referencia directa al `SkipNode` que lo contien
 
 ## Mejoras sugeridas
 
-> Las mejoras detalladas, con propuestas de implementación, se encuentran en el documento [`IMPROVEMENTS.md`](./IMPROVEMENTS.md).
+> Las mejoras detalladas, con propuestas de implementación, se encuentran en el documento [`ISSUES.md`](./ISSUES.md).
 
 ### Resumen
 
@@ -338,8 +381,32 @@ php \
 Some tests inside tests.php, extended coverage with PHPUnit:
 
 - php tests.php
-- ./vendor/bin/phpunit tests/
-- ./vendor/phpstan/phpstan/phpstan --error-format=raw
+- ./vendor/bin/phpunit
+- ./vendor/bin/phpstan analyse --error-format=raw
+
+Requirements: PHP >= 8.1 and, for PHPUnit, the PHP extensions `dom`, `mbstring`
+and `xmlwriter` (plus `json`, `libxml` and `tokenizer`, usually built in). The
+library itself doesn't need them. On Debian/Ubuntu:
+
+    sudo apt install php-xml php-mbstring
+
+Without them `composer install` refuses to install PHPUnit, and PHPUnit stops with
+"PHPUnit requires the "dom", ... extensions".
+
+Known issues and their status are tracked in [`ISSUES.md`](./ISSUES.md). To see
+which ones are already fixed:
+
+- ./vendor/bin/phpunit --testsuite issues --testdox --colors=never
+
+Stress suite: 32 radar-coverage scenarios (8 and 9 radars within 300 km, 720-vertex
+irregular coverages, exact coverage layers 0..N computed two independent ways and
+checked without using the library). It takes ~1-3 minutes per scenario, so it is not
+part of the default suite; CI runs it on every merge to `main`
+(`.github/workflows/stress.yml`, 8 parallel shards on PHP 8.3 and 8.5), and it can be
+run by hand from the Actions tab on any branch. Locally:
+
+- ./vendor/bin/phpunit --testsuite stress
+- STRESS_SHARDS=4 STRESS_SHARD=0 ./vendor/bin/phpunit --testsuite stress   (shard 1 of 4)
 
 ## Tutorials and notes
 

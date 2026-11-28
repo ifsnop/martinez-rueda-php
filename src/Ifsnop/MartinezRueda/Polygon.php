@@ -7,7 +7,7 @@ namespace Ifsnop\MartinezRueda;
 final class Polygon
 {
 	public array $regions;
-	public bool $isInverted;
+	public bool $isInverted = false; // con valor por defecto: Polygon::create() sin rellenar es un operando vacío válido
 	public int $numPoints;
 
 	public function __toString(): string
@@ -36,6 +36,7 @@ final class Polygon
 		return $arr_regions;
 	}
 
+	/** @api API pública */
 	public function getArrayClosed(): array
 	{
 		$arr_regions = [];

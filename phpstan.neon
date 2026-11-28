@@ -3,7 +3,7 @@ includes:
 parameters:
     level: 5
     paths:
-        - ./src/Ifnsop/MartinezRueda/*.php
+        - ./src/Ifsnop/MartinezRueda
     excludePaths:
         - 'tests/*'
         - 'vendor/*'

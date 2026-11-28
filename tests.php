@@ -10,8 +10,37 @@ error_reporting(E_ALL);
 ini_set("display_errors", '1');
 
 use Ifsnop\MartinezRueda as MR;
+use Ifsnop\MartinezRueda\Tests\Support\GeometryOracle;
+use Ifsnop\MartinezRueda\Tests\Support\RegionComparator;
 
 include_once('autoloader.php');
+require_once('tests/Support/PolygonGenerator.php');
+require_once('tests/Support/GeometryOracle.php');
+require_once('tests/Support/BoundaryIndex.php');
+require_once('tests/Support/RegionComparator.php');
+
+/*
+ * Comprueba el resultado $R de una operación con un oráculo independiente de la
+ * librería (ISSUES.md #4): en puntos de muestra, "dentro de R" debe coincidir con
+ * op(dentro de A, dentro de B). Devuelve el número de puntos mal clasificados.
+ */
+function oracleWrong(array $A, array $B, array $R, callable $truth, int $samples = 400): int
+{
+	$A = RegionComparator::rings($A);
+	$B = RegionComparator::rings($B);
+	$R = RegionComparator::rings($R);
+	$all = array_merge(...array_merge($A, $B));
+	$xs = array_column($all, 0);
+	$ys = array_column($all, 1);
+	mt_srand(1);
+	$pts = [];
+	for ($k = 0; $k < $samples; $k++) {
+		$pts[] = [min($xs) + mt_rand() / mt_getrandmax() * (max($xs) - min($xs)),
+		          min($ys) + mt_rand() / mt_getrandmax() * (max($ys) - min($ys))];
+	}
+	$eps = 1e-6 * max(max($xs) - min($xs), max($ys) - min($ys));
+	return GeometryOracle::countWrong($A, $B, $R, $truth, $pts, $eps);
+}
 
 $test = [
 	0 => [
@@ -101,7 +130,6 @@ $test = [
 			'union' => [
 				[[18.1054513, 60.4585421], [18.105679846052, 60.458514506685], [18.1057195, 60.4586056], [18.10556875, 60.458569907886], [18.1055, 60.4587], [18.1054513, 60.4585421]],
 				[[18.10563, 60.4584], [18.1059, 60.4584], [18.1058, 60.4585], [18.105679846052, 60.458514506685], [18.10563, 60.4584]]
-
 			],
 		],
 	],
@@ -120,7 +148,6 @@ $test = [
 			'xoring' => [[[[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2], [0, 0]]], [[[1, 2], [2, 2], [2, 1], [3, 1], [3, 3], [1, 3], [1, 2]]]],
 		],
 	],
-
 	12 => [ // union
 		'region_a' => [[[-60.69023, -40.8338], [-60.6874, -40.83431837489067], [-60.6873, -40.832], [-60.69023, -40.8338]]],
 		'region_b' => [[[-60.686, -40.836], [-60.6841701, -40.83491], [-60.6876, -40.83428174062278], [-60.686, -40.836]]],
@@ -131,16 +158,16 @@ $test = [
 	],
 	13 => [ // ejemplo de fallo para TOLERANCE == 1e-9, pero que se soluciona con TOLERANCE == 1e-12 (son dos polígonos con un vértice casi colineal, pero no exactamente, y el algoritmo de intersección los considera paralelos si la tolerancia es demasiado alta)
 		'region_a' => [[
-    		[40.53363568130732, -3.5245698583174576],
-    		[40.53363568130732, -3.523313475015876 ],
-    		[40.49956209027567, -3.523761811338624 ],
-    		[40.49956209027567, -3.5241215219947093],
+		[40.53363568130732, -3.5245698583174576],
+		[40.53363568130732, -3.523313475015876 ],
+		[40.49956209027567, -3.523761811338624 ],
+		[40.49956209027567, -3.5241215219947093],
 		]],
 		'region_b' => [[
 			[40.498860930663234, -3.523769587464169],
-    		[40.49886780983072,  -3.524147669692794],
-    		[40.4995689976698,   -3.524121458419516],
-    		[40.49956237672506,  -3.523761808702163],
+		[40.49886780983072,  -3.524147669692794],
+		[40.4995689976698,   -3.524121458419516],
+		[40.49956237672506,  -3.523761808702163],
 		]],
 		'res' => [
 			'union' =>[[
@@ -150,6 +177,10 @@ $test = [
 				[40.49956594138672017, -3.52412157266717774],
 				[40.49886780983072043, -3.52414766969279381],
 				[40.49886093066323411, -3.52376958746416902],
+				// Cruce del lado superior de B con el lado izquierdo de A, 5.4e-10 (~60 µm)
+				// por debajo de la esquina de A. Con la tolerancia de área (antes de
+				// ISSUES.md #1) se eliminaba por "colineal" (|cross| = 3.8e-13 < 1e-12).
+				[40.49956209027567, -3.5237618118787744],
 			]],
 		],
 	],
@@ -206,6 +237,10 @@ exit(0);
 // el algoritmo devuelve o bien polígonos o bien listas de polígonos, dependiendo
 // del resultado de la operación.
 
+// $fail se inicializa aquí, antes de las pruebas de continentes: antes se reiniciaba
+// después de ellas y un FAIL en los continentes no afectaba al código de salida.
+$fail = false;
+
 print "xoring australia with shifted australia...";
 $australia = MR\GJTools::geojsonToArray("tests/continents_australia.json");
 $polygon_australia = MR\Polygon::create()->fillFromArray($australia);
@@ -221,8 +256,12 @@ $result = MR\Algorithm::xoring($polygon_australia, $shifted_polygon_australia); 
 // $result_normalized = MR\GJTools::geojsonToArray($result->getArray()); // devuelve un array
 // print json_encode($result_normalized) . PHP_EOL;
 // exit(1);
-if ($result->numPoints == 1340) print "PASS" . PHP_EOL;
-else print "FAIL(" . $result->numPoints . ")" . PHP_EOL;
+// Antes solo se comprobaba el número de vértices (1340): un resultado erróneo con el
+// mismo número pasaba y uno correcto con un vértice colineal de más fallaba.
+$wrong = oracleWrong($australia, $shifted_australia, $result->getArray(), fn(bool $a, bool $b) => $a !== $b);
+$bordersOk = RegionComparator::xorBoundariesConsistent($australia, $shifted_australia, $result->getArray(), null, $why);
+if ($wrong === 0 && $bordersOk) print "PASS ({$result->numPoints} vértices)" . PHP_EOL;
+else { print "FAIL (" . ($wrong ? "$wrong puntos mal clasificados; " : "") . ($why ?? "") . ")" . PHP_EOL; $fail = true; }
 
 print "xoring europe with shifted europe...";
 $europe = MR\GJTools::geojsonToArray("tests/continents_europe.json");
@@ -230,8 +269,10 @@ $polygon_europe = MR\Polygon::create()->fillFromArray($europe);
 $shifted_europe = displaceMultiPolygon($europe, -0.5);
 $shifted_polygon_europe = MR\Polygon::create()->fillFromArray($shifted_europe);
 $result = MR\Algorithm::xoring($polygon_europe, $shifted_polygon_europe);
-if ($result->numPoints == 9178) print "PASS" . PHP_EOL;
-else print "FAIL(" . $result->numPoints . ")" . PHP_EOL;
+$wrong = oracleWrong($europe, $shifted_europe, $result->getArray(), fn(bool $a, bool $b) => $a !== $b);
+$bordersOk = RegionComparator::xorBoundariesConsistent($europe, $shifted_europe, $result->getArray(), null, $why);
+if ($wrong === 0 && $bordersOk) print "PASS ({$result->numPoints} vértices)" . PHP_EOL;
+else { print "FAIL (" . ($wrong ? "$wrong puntos mal clasificados; " : "") . ($why ?? "") . ")" . PHP_EOL; $fail = true; }
 
 /*
 $result_normalized = MR\GJTools::geojsonToArray($result->getArray()); // devuelve un array
@@ -253,7 +294,6 @@ print "result 2#" . $result->numPoints . PHP_EOL;
 //exit(0);
 
 
-$fail = false;
 $debug = false;
 foreach ($test as $test_number => $test_predicates) {
 
