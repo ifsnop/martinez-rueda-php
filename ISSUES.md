@@ -42,8 +42,8 @@ at a time. Tick the box when an item is done.
 | [2](#2-endpoint-snapping-tolerance-is-relative-to-segment-length) | Endpoint snapping tolerance is relative to segment length | High | Fixed (this branch) |
 | [3](#3-fill-rule-for-overlapping-parts-and-duplicated-rings-is-undecided) | Fill rule for overlapping parts / duplicated rings undecided | Medium | Open, decision needed (behaviour is consistent) |
 | [4](#4-e2e-comparison-uses-the-library-itself-false-passes) | E2E comparison uses the library itself (false passes) | Medium | Fixed (this branch) |
-| [5](#5-polygoncreate-leaves-isinverted-uninitialized) | `Polygon::create()` leaves `isInverted` uninitialized | Low | Open |
-| [6](#6-many-with-a-single-polygon-return-the-raw-input) | `*Many()` with a single polygon return the raw input | Low | Open |
+| [5](#5-polygoncreate-leaves-isinverted-uninitialized) | `Polygon::create()` leaves `isInverted` uninitialized | Low | Fixed (this branch) |
+| [6](#6-many-with-a-single-polygon-return-the-raw-input) | `*Many()` with a single polygon return the raw input | Low | Fixed (this branch) |
 | [7](#7-gjtools-rejects-the-whole-input-when-one-ring-is-degenerate) | GJTools rejects the whole input when one ring is degenerate | Low | Open, decision needed |
 | [8](#8-pointkey-overflows-and-projected-coordinates-are-not-supported) | `pointKey()` overflow / projected coordinates | Low (lon/lat) | Documented limitation; fix plan tested |
 | [9](#9-remaining-phpstan-findings) | Remaining PHPStan findings | Low | Fixed (this branch); PHPStan now blocking in CI |
@@ -472,42 +472,43 @@ the 8 fixtures should leave `KNOWN_DEVIATIONS`.
 
 ### 5. `Polygon::create()` leaves `isInverted` uninitialized
 
-- [ ] Open.
+- [x] Fixed on this branch.
 
-**Problem.** `Polygon::$isInverted` is a typed property without a default, and
-only `fillFromArray()` sets it. Using `Polygon::create()` directly as an operand
-throws `Error: Typed property ...::$isInverted must not be accessed before initialization`.
+**Problem.** `Polygon::$isInverted` was a typed property without a default, and only
+`fillFromArray()` set it. Using an unfilled `Polygon::create()` as an operand threw
+`Error: Typed property ...::$isInverted must not be accessed before initialization`.
+Since item 11 the public operations hid it, because normalization rebuilds the operands,
+but the low-level API (`Algorithm::segments(Polygon::create())`) still failed.
 
-**Repro.** `Algorithm::segments(Polygon::create())`. Since item 11, the public operations
-normalize (and rebuild) their operands, so `Algorithm::union(Polygon::create(), $p)` no
-longer fails; the low-level API still does. The progress check tests both.
+**Fix.** `public bool $isInverted = false;`. `InputNormalizer` no longer needs its
+`?? false` fallback, which PHPStan would now flag as unnecessary.
 
-**Proposed fix.** `public bool $isInverted = false;` in
-`src/Ifsnop/MartinezRueda/Polygon.php`, or set it in `__construct()` (line 53).
-Then `PolygonClippingE2ETest` can use `Polygon::create()` instead of the
-`fillFromArray([])` workaround.
-
-**Verify.** Add a test where an empty polygon is used as either operand of every
-operation.
+**Verify.** `tests/PolygonTest.php`: the default value, the low-level API, and an
+unfilled polygon as an empty operand of `union` and `intersect`. The first two fail with
+the old code.
 
 ### 6. `*Many()` with a single polygon return the raw input
 
-- [ ] Open.
+- [x] Fixed on this branch.
 
-**Problem.** `unionMany`, `intersectMany`, `xorMany` and `differenceMany`
-(`Algorithm.php:662–717`) return the input polygon unchanged when given one
-polygon. With two or more, the result is cleaned (self-intersections resolved,
-overlapping rings merged by the fill rule). So `unionMany([$p])` and
-`unionMany([$p, $empty])` can differ.
+**Problem.** `unionMany`, `intersectMany`, `xorMany` and `differenceMany` returned the
+input polygon unchanged when given one polygon: neither cleaned (self-intersections and
+overlapping rings unresolved) nor normalized. With two or more polygons the result is
+cleaned, so `unionMany([$p])` and `unionMany([$p, $empty])` could differ.
 
-**Repro.** `unionMany([two overlapping rings])` returns the two rings as given.
+**Fix.** With one polygon they return `union(P, empty, $precision)`, the same cleaned and
+normalized result as any other operation. P ∪ ∅ = P ∩ P = P xor ∅ = P − ∅, so this
+holds for all four.
 
-**Proposed fix.** For n = 1 return the cleaned polygon, as `union($p, empty)` does:
-`self::polygon(self::makePolySegments(self::boundaryOnly(self::segments($p)->segments), $p->isInverted))`.
-Decide first whether "identity" was intentional, for example for speed.
+**Behaviour change.** Before, the call returned the same object at no cost; now it
+returns a new, cleaned copy and runs one operation. Code that relied on getting the same
+instance back has to change.
 
-**Verify.** Compare `unionMany([$p])` with `union($p, empty)` on the
-single-geometry fixtures.
+**Verify.** `tests/PolygonTest.php`: for each `*Many([P])` with two overlapping squares,
+the result is a new object, equals `union(P, empty)`, no longer contains the cancelled
+overlap, and honours an explicit `$precision`. Those tests fail with the old code. The
+radar stress scenario "8 radars, seed 2, 7 decimals", whose combinations method calls
+`intersectMany` with single radars, stays exact.
 
 ### 7. GJTools rejects the whole input when one ring is degenerate
 

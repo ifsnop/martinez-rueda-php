@@ -148,7 +148,7 @@ final class InputNormalizer
             }
             $p = Polygon::create();
             $p->regions = $regions;
-            $p->isInverted = $poly->isInverted ?? false;
+            $p->isInverted = $poly->isInverted;
             $p->numPoints = array_sum(array_map('count', $regions));
             $result[$k] = $p;
         }

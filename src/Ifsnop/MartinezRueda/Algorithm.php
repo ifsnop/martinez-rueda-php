@@ -710,8 +710,9 @@ final class Algorithm
             throw new \InvalidArgumentException('unionMany requires at least one polygon.');
         }
         if ( 1 === $n ) {
-	    $key = array_key_first($polygons);
-            return $polygons[$key]; // identidad
+            // Un solo polígono: copia limpia y normalizada, igual que union(P, vacío)
+            // (P ∪ ∅ = P ∩ P = P xor ∅ = P − ∅). Antes se devolvía tal cual (ISSUES.md #6).
+            return self::union($polygons[array_key_first($polygons)], Polygon::create(), $precision);
         }
         $polygons = self::normalizeInputs($polygons, $precision);
         $items = self::polygonsToSegments($polygons);
@@ -731,8 +732,9 @@ final class Algorithm
             throw new \InvalidArgumentException('intersectMany requires at least one polygon.');
         }
         if ( 1 === $n ) {
-	    $key = array_key_first($polygons);
-            return $polygons[$key]; // identidad
+            // Un solo polígono: copia limpia y normalizada, igual que union(P, vacío)
+            // (P ∪ ∅ = P ∩ P = P xor ∅ = P − ∅). Antes se devolvía tal cual (ISSUES.md #6).
+            return self::union($polygons[array_key_first($polygons)], Polygon::create(), $precision);
         }
         $polygons = self::normalizeInputs($polygons, $precision);
         $items = self::polygonsToSegments($polygons);
@@ -751,8 +753,9 @@ final class Algorithm
             throw new \InvalidArgumentException('xorMany requires at least one polygon.');
         }
         if ( 1 === $n ) {
-	    $key = array_key_first($polygons);
-            return $polygons[$key]; // identidad
+            // Un solo polígono: copia limpia y normalizada, igual que union(P, vacío)
+            // (P ∪ ∅ = P ∩ P = P xor ∅ = P − ∅). Antes se devolvía tal cual (ISSUES.md #6).
+            return self::union($polygons[array_key_first($polygons)], Polygon::create(), $precision);
         }
         $polygons = self::normalizeInputs($polygons, $precision);
         $items = self::polygonsToSegments($polygons);
@@ -776,8 +779,9 @@ final class Algorithm
             throw new \InvalidArgumentException('differenceMany requires at least one polygon.');
         }
         if ( 1 === $n ) {
-	    $key = array_key_first($polygons);
-            return $polygons[$key]; // identidad
+            // Un solo polígono: copia limpia y normalizada, igual que union(P, vacío)
+            // (P ∪ ∅ = P ∩ P = P xor ∅ = P − ∅). Antes se devolvía tal cual (ISSUES.md #6).
+            return self::union($polygons[array_key_first($polygons)], Polygon::create(), $precision);
         }
         $polygons = self::normalizeInputs($polygons, $precision);
         // ((subject \ mask1) \ mask2) \ ...

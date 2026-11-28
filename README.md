@@ -163,7 +163,7 @@ Algorithm::xoring(Polygon $a, Polygon $b, ?float $precision = null): Polygon
 ### Operaciones n-arias
 
 ```php
-// Al menos un polígono; con uno solo se devuelve tal cual
+// Al menos un polígono; con uno solo se devuelve limpio (igual que union(P, vacío))
 Algorithm::unionMany(array $polygons, ?float $precision = null): Polygon
 Algorithm::intersectMany(array $polygons, ?float $precision = null): Polygon
 Algorithm::xorMany(array $polygons, ?float $precision = null): Polygon
